@@ -9,6 +9,7 @@ import { Question } from '@/types/medical';
 import { useMedical } from '@/context/MedicalContext';
 import { QuestionComponent } from './QuestionComponent';
 import { ReviewOfSystemsComponent } from './ReviewOfSystemsComponent';
+import { ClinicalSummary } from './ClinicalSummary';
 import { useSaveQuestions, useSaveAnswer, useUpdateAssessmentStep } from '@/hooks/useAssessment';
 
 interface AssessmentWorkflowProps {
@@ -24,6 +25,7 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showROS, setShowROS] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
   const [questionsGenerated, setQuestionsGenerated] = useState(false);
 
   const saveQuestionsMutation = useSaveQuestions();
@@ -33,7 +35,7 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
   const steps = [
     'History of Present Illness',
     'Review of Systems', 
-    'Past Medical History',
+    'Clinical Assessment',
     'Physical Examination',
     'Assessment & Plan'
   ];
@@ -61,7 +63,7 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
       }
     } catch (err) {
       console.error('Error loading questions:', err);
-      setError('Failed to load questions. Using fallback questions.');
+      setError('Failed to load AI-generated questions. Using fallback questions.');
       // Fallback questions would be loaded here
     } finally {
       setLoading(false);
@@ -118,6 +120,7 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
   };
 
   const handleROSComplete = async () => {
+    setShowSummary(true);
     dispatch({ type: 'SET_STEP', payload: 3 });
     
     // Update assessment step in database
@@ -127,11 +130,13 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
         step: 3
       });
     }
-    
+  };
+
+  const handleSummaryComplete = () => {
     onComplete();
   };
 
-  const progressPercent = showROS ? 40 : (currentQuestionIndex / Math.max(questions.length, 1)) * 30;
+  const progressPercent = showSummary ? 60 : showROS ? 40 : (currentQuestionIndex / Math.max(questions.length, 1)) * 30;
 
   if (loading) {
     return (
@@ -144,6 +149,20 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
           </CardContent>
         </Card>
       </div>
+    );
+  }
+
+  if (showSummary) {
+    return (
+      <ClinicalSummary
+        chiefComplaint={chiefComplaint}
+        onComplete={handleSummaryComplete}
+        onBack={() => {
+          setShowSummary(false);
+          setShowROS(true);
+          dispatch({ type: 'SET_STEP', payload: 2 });
+        }}
+      />
     );
   }
 

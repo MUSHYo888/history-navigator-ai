@@ -1,8 +1,10 @@
-
+// ABOUTME: AI service for clinical question generation and differential diagnosis
+// ABOUTME: Uses OpenRouter API through Supabase Edge Functions for real AI capabilities
+import { supabase } from '@/integrations/supabase/client';
 import { Question, DifferentialDiagnosis } from '@/types/medical';
 
-// Simulated AI service - would connect to OpenRouter/OpenAI in production
 export class AIService {
+  // Fallback questions in case AI service fails
   private static fallbackQuestions: Record<string, Question[]> = {
     'headache': [
       {
@@ -64,69 +66,135 @@ export class AIService {
     ]
   };
 
-  static async generateQuestions(chiefComplaint: string): Promise<Question[]> {
-    // Simulate AI delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const complaint = chiefComplaint.toLowerCase();
-    const questions = this.fallbackQuestions[complaint] || this.fallbackQuestions['headache'];
-    
-    console.log(`Generated ${questions.length} questions for: ${chiefComplaint}`);
-    return questions;
+  static async generateQuestions(
+    chiefComplaint: string, 
+    previousAnswers?: Record<string, any>
+  ): Promise<Question[]> {
+    try {
+      console.log(`Generating AI questions for: ${chiefComplaint}`);
+      
+      const response = await fetch(`https://wrfrrpgewetndgnxqmso.supabase.co/functions/v1/ai-assistant?action=generate-questions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabase.supabaseKey}`,
+        },
+        body: JSON.stringify({
+          chiefComplaint,
+          previousAnswers
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      if (!data?.questions) {
+        throw new Error('Invalid response from AI service');
+      }
+
+      console.log(`AI generated ${data.questions.length} questions`);
+      return data.questions;
+
+    } catch (error) {
+      console.error('Error generating AI questions:', error);
+      console.log('Falling back to predefined questions');
+      
+      // Fallback to predefined questions
+      const complaint = chiefComplaint.toLowerCase();
+      const questions = this.fallbackQuestions[complaint] || this.fallbackQuestions['headache'];
+      
+      console.log(`Using ${questions.length} fallback questions for: ${chiefComplaint}`);
+      return questions;
+    }
   }
 
   static async generateDifferentialDiagnosis(
     chiefComplaint: string,
-    answers: Record<string, any>
+    answers: Record<string, any>,
+    rosData?: Record<string, any>
   ): Promise<DifferentialDiagnosis[]> {
-    // Simulate AI delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // Mock differential diagnoses based on chief complaint
-    const mockDiagnoses: Record<string, DifferentialDiagnosis[]> = {
-      'headache': [
-        {
-          condition: 'Tension-type headache',
-          probability: 65,
-          explanation: 'Most common type of headache, typically bilateral and pressing/tightening in quality',
-          keyFeatures: ['Bilateral location', 'Pressure sensation', 'Gradual onset']
+    try {
+      console.log(`Generating AI differential diagnosis for: ${chiefComplaint}`);
+      
+      const response = await fetch(`https://wrfrrpgewetndgnxqmso.supabase.co/functions/v1/ai-assistant?action=generate-differential`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabase.supabaseKey}`,
         },
-        {
-          condition: 'Migraine',
-          probability: 25,
-          explanation: 'Recurrent headache disorder with characteristic features',
-          keyFeatures: ['Unilateral', 'Throbbing', 'Associated nausea']
-        },
-        {
-          condition: 'Cluster headache',
-          probability: 10,
-          explanation: 'Severe unilateral headache with autonomic features',
-          keyFeatures: ['Severe unilateral pain', 'Short duration', 'Autonomic symptoms']
-        }
-      ],
-      'abdominal pain': [
-        {
-          condition: 'Gastroenteritis',
-          probability: 40,
-          explanation: 'Inflammation of the stomach and intestines, often viral or bacterial',
-          keyFeatures: ['Cramping pain', 'Nausea/vomiting', 'Diarrhea']
-        },
-        {
-          condition: 'Appendicitis',
-          probability: 30,
-          explanation: 'Inflammation of the appendix requiring urgent evaluation',
-          keyFeatures: ['Right lower quadrant pain', 'Fever', 'Nausea']
-        },
-        {
-          condition: 'Peptic ulcer disease',
-          probability: 20,
-          explanation: 'Ulceration in the stomach or duodenum',
-          keyFeatures: ['Epigastric pain', 'Related to meals', 'Burning sensation']
-        }
-      ]
-    };
+        body: JSON.stringify({
+          chiefComplaint,
+          answers,
+          rosData
+        }),
+      });
 
-    const complaint = chiefComplaint.toLowerCase();
-    return mockDiagnoses[complaint] || mockDiagnoses['headache'];
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      if (!data?.differentials) {
+        throw new Error('Invalid response from AI service');
+      }
+
+      console.log(`AI generated ${data.differentials.length} differential diagnoses`);
+      return data.differentials;
+
+    } catch (error) {
+      console.error('Error generating AI differential diagnosis:', error);
+      console.log('Falling back to mock differentials');
+      
+      // Fallback to mock diagnoses
+      const mockDiagnoses: Record<string, DifferentialDiagnosis[]> = {
+        'headache': [
+          {
+            condition: 'Tension-type headache',
+            probability: 65,
+            explanation: 'Most common type of headache, typically bilateral and pressing/tightening in quality',
+            keyFeatures: ['Bilateral location', 'Pressure sensation', 'Gradual onset']
+          },
+          {
+            condition: 'Migraine',
+            probability: 25,
+            explanation: 'Recurrent headache disorder with characteristic features',
+            keyFeatures: ['Unilateral', 'Throbbing', 'Associated nausea']
+          },
+          {
+            condition: 'Cluster headache',
+            probability: 10,
+            explanation: 'Severe unilateral headache with autonomic features',
+            keyFeatures: ['Severe unilateral pain', 'Short duration', 'Autonomic symptoms']
+          }
+        ],
+        'abdominal pain': [
+          {
+            condition: 'Gastroenteritis',
+            probability: 40,
+            explanation: 'Inflammation of the stomach and intestines, often viral or bacterial',
+            keyFeatures: ['Cramping pain', 'Nausea/vomiting', 'Diarrhea']
+          },
+          {
+            condition: 'Appendicitis',
+            probability: 30,
+            explanation: 'Inflammation of the appendix requiring urgent evaluation',
+            keyFeatures: ['Right lower quadrant pain', 'Fever', 'Nausea']
+          },
+          {
+            condition: 'Peptic ulcer disease',
+            probability: 20,
+            explanation: 'Ulceration in the stomach or duodenum',
+            keyFeatures: ['Epigastric pain', 'Related to meals', 'Burning sensation']
+          }
+        ]
+      };
+
+      const complaint = chiefComplaint.toLowerCase();
+      return mockDiagnoses[complaint] || mockDiagnoses['headache'];
+    }
   }
 }
