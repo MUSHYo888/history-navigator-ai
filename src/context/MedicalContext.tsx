@@ -1,100 +1,115 @@
 
-import React, { createContext, useContext, useReducer, useEffect } from 'react';
+// ABOUTME: Global state management for medical assessment workflow
+// ABOUTME: Manages patient data, assessment state, answers, and clinical data
+import React, { createContext, useContext, useReducer, ReactNode } from 'react';
 import { Patient, Assessment, Answer, ReviewOfSystems } from '@/types/medical';
+
+interface PastMedicalHistoryData {
+  conditions: string[];
+  surgeries: string[];
+  medications: string[];
+  allergies: string[];
+  familyHistory: string;
+  socialHistory: string;
+}
+
+interface PhysicalExamData {
+  vitalSigns: {
+    bloodPressure: string;
+    heartRate: string;
+    respiratoryRate: string;
+    temperature: string;
+    oxygenSaturation: string;
+  };
+  systems: {
+    [systemName: string]: {
+      normal: boolean;
+      findings: string[];
+      notes: string;
+    };
+  };
+  generalAppearance: string;
+}
 
 interface MedicalState {
   currentPatient: Patient | null;
   currentAssessment: Assessment | null;
-  patients: Patient[];
-  answers: Record<string, Answer>;
-  reviewOfSystems: ReviewOfSystems;
   currentStep: number;
+  answers: Record<string, Answer>;
+  rosData: ReviewOfSystems;
+  pmhData: PastMedicalHistoryData | null;
+  peData: PhysicalExamData | null;
 }
 
 type MedicalAction =
   | { type: 'SET_CURRENT_PATIENT'; payload: Patient }
   | { type: 'SET_CURRENT_ASSESSMENT'; payload: Assessment }
-  | { type: 'ADD_PATIENT'; payload: Patient }
-  | { type: 'UPDATE_PATIENTS'; payload: Patient[] }
-  | { type: 'ADD_ANSWER'; payload: { questionId: string; answer: Answer } }
-  | { type: 'UPDATE_ROS'; payload: { system: string; data: any } }
   | { type: 'SET_STEP'; payload: number }
+  | { type: 'ADD_ANSWER'; payload: { questionId: string; answer: Answer } }
+  | { type: 'SET_ROS_DATA'; payload: ReviewOfSystems }
+  | { type: 'SET_PMH_DATA'; payload: PastMedicalHistoryData }
+  | { type: 'SET_PE_DATA'; payload: PhysicalExamData }
   | { type: 'RESET_ASSESSMENT' };
 
 const initialState: MedicalState = {
   currentPatient: null,
   currentAssessment: null,
-  patients: [],
-  answers: {},
-  reviewOfSystems: {},
   currentStep: 1,
+  answers: {},
+  rosData: {},
+  pmhData: null,
+  peData: null
 };
 
 function medicalReducer(state: MedicalState, action: MedicalAction): MedicalState {
   switch (action.type) {
     case 'SET_CURRENT_PATIENT':
       return { ...state, currentPatient: action.payload };
+    
     case 'SET_CURRENT_ASSESSMENT':
       return { ...state, currentAssessment: action.payload };
-    case 'ADD_PATIENT':
-      return { ...state, patients: [...state.patients, action.payload] };
-    case 'UPDATE_PATIENTS':
-      return { ...state, patients: action.payload };
+    
+    case 'SET_STEP':
+      return { ...state, currentStep: action.payload };
+    
     case 'ADD_ANSWER':
       return {
         ...state,
-        answers: { ...state.answers, [action.payload.questionId]: action.payload.answer }
+        answers: {
+          ...state.answers,
+          [action.payload.questionId]: action.payload.answer
+        }
       };
-    case 'UPDATE_ROS':
-      return {
-        ...state,
-        reviewOfSystems: { ...state.reviewOfSystems, [action.payload.system]: action.payload.data }
-      };
-    case 'SET_STEP':
-      return { ...state, currentStep: action.payload };
+    
+    case 'SET_ROS_DATA':
+      return { ...state, rosData: action.payload };
+    
+    case 'SET_PMH_DATA':
+      return { ...state, pmhData: action.payload };
+    
+    case 'SET_PE_DATA':
+      return { ...state, peData: action.payload };
+    
     case 'RESET_ASSESSMENT':
-      return { ...state, currentAssessment: null, answers: {}, reviewOfSystems: {}, currentStep: 1 };
+      return {
+        ...initialState,
+        currentPatient: state.currentPatient
+      };
+    
     default:
       return state;
   }
 }
 
-const MedicalContext = createContext<{
+interface MedicalContextType {
   state: MedicalState;
   dispatch: React.Dispatch<MedicalAction>;
-} | null>(null);
+}
 
-export function MedicalProvider({ children }: { children: React.ReactNode }) {
+const MedicalContext = createContext<MedicalContextType | undefined>(undefined);
+
+export function MedicalProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(medicalReducer, initialState);
-
-  // Persist state to localStorage
-  useEffect(() => {
-    const saved = localStorage.getItem('historyProState');
-    if (saved) {
-      try {
-        const parsedState = JSON.parse(saved);
-        if (parsedState.currentPatient) {
-          dispatch({ type: 'SET_CURRENT_PATIENT', payload: parsedState.currentPatient });
-        }
-        if (parsedState.currentAssessment) {
-          dispatch({ type: 'SET_CURRENT_ASSESSMENT', payload: parsedState.currentAssessment });
-        }
-        if (parsedState.patients) {
-          dispatch({ type: 'UPDATE_PATIENTS', payload: parsedState.patients });
-        }
-      } catch (error) {
-        console.error('Failed to load saved state:', error);
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem('historyProState', JSON.stringify({
-      currentPatient: state.currentPatient,
-      currentAssessment: state.currentAssessment,
-      patients: state.patients,
-    }));
-  }, [state.currentPatient, state.currentAssessment, state.patients]);
 
   return (
     <MedicalContext.Provider value={{ state, dispatch }}>
@@ -105,7 +120,7 @@ export function MedicalProvider({ children }: { children: React.ReactNode }) {
 
 export function useMedical() {
   const context = useContext(MedicalContext);
-  if (!context) {
+  if (context === undefined) {
     throw new Error('useMedical must be used within a MedicalProvider');
   }
   return context;

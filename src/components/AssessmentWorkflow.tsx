@@ -9,6 +9,8 @@ import { Question } from '@/types/medical';
 import { useMedical } from '@/context/MedicalContext';
 import { QuestionComponent } from './QuestionComponent';
 import { ReviewOfSystemsComponent } from './ReviewOfSystemsComponent';
+import { PastMedicalHistory } from './PastMedicalHistory';
+import { PhysicalExamination } from './PhysicalExamination';
 import { ClinicalSummary } from './ClinicalSummary';
 import { useSaveQuestions, useSaveAnswer, useUpdateAssessmentStep } from '@/hooks/useAssessment';
 
@@ -25,6 +27,8 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showROS, setShowROS] = useState(false);
+  const [showPMH, setShowPMH] = useState(false);
+  const [showPE, setShowPE] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
   const [questionsGenerated, setQuestionsGenerated] = useState(false);
 
@@ -35,7 +39,7 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
   const steps = [
     'History of Present Illness',
     'Review of Systems', 
-    'Clinical Assessment',
+    'Past Medical History',
     'Physical Examination',
     'Assessment & Plan'
   ];
@@ -120,7 +124,8 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
   };
 
   const handleROSComplete = async () => {
-    setShowSummary(true);
+    setShowROS(false);
+    setShowPMH(true);
     dispatch({ type: 'SET_STEP', payload: 3 });
     
     // Update assessment step in database
@@ -132,11 +137,51 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
     }
   };
 
+  const handlePMHComplete = async (pmhData: any) => {
+    // Store PMH data in context
+    dispatch({
+      type: 'SET_PMH_DATA',
+      payload: pmhData
+    });
+    
+    setShowPMH(false);
+    setShowPE(true);
+    dispatch({ type: 'SET_STEP', payload: 4 });
+    
+    // Update assessment step in database
+    if (state.currentAssessment) {
+      await updateStepMutation.mutateAsync({
+        assessmentId: state.currentAssessment.id,
+        step: 4
+      });
+    }
+  };
+
+  const handlePEComplete = async (peData: any) => {
+    // Store PE data in context
+    dispatch({
+      type: 'SET_PE_DATA',
+      payload: peData
+    });
+    
+    setShowPE(false);
+    setShowSummary(true);
+    dispatch({ type: 'SET_STEP', payload: 5 });
+    
+    // Update assessment step in database
+    if (state.currentAssessment) {
+      await updateStepMutation.mutateAsync({
+        assessmentId: state.currentAssessment.id,
+        step: 5
+      });
+    }
+  };
+
   const handleSummaryComplete = () => {
     onComplete();
   };
 
-  const progressPercent = showSummary ? 60 : showROS ? 40 : (currentQuestionIndex / Math.max(questions.length, 1)) * 30;
+  const progressPercent = showSummary ? 100 : showPE ? 80 : showPMH ? 60 : showROS ? 40 : (currentQuestionIndex / Math.max(questions.length, 1)) * 30;
 
   if (loading) {
     return (
@@ -159,6 +204,32 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
         onComplete={handleSummaryComplete}
         onBack={() => {
           setShowSummary(false);
+          setShowPE(true);
+          dispatch({ type: 'SET_STEP', payload: 4 });
+        }}
+      />
+    );
+  }
+
+  if (showPE) {
+    return (
+      <PhysicalExamination
+        onComplete={handlePEComplete}
+        onBack={() => {
+          setShowPE(false);
+          setShowPMH(true);
+          dispatch({ type: 'SET_STEP', payload: 3 });
+        }}
+      />
+    );
+  }
+
+  if (showPMH) {
+    return (
+      <PastMedicalHistory
+        onSubmit={handlePMHComplete}
+        onBack={() => {
+          setShowPMH(false);
           setShowROS(true);
           dispatch({ type: 'SET_STEP', payload: 2 });
         }}
