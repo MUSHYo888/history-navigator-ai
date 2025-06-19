@@ -8,11 +8,13 @@ const corsHeaders = {
 };
 
 interface GenerateQuestionsRequest {
+  action: string;
   chiefComplaint: string;
   previousAnswers?: Record<string, any>;
 }
 
 interface GenerateDifferentialRequest {
+  action: string;
   chiefComplaint: string;
   answers: Record<string, any>;
   rosData?: Record<string, any>;
@@ -29,11 +31,25 @@ serve(async (req) => {
       throw new Error('OPENROUTER_API_KEY is not configured');
     }
 
-    const url = new URL(req.url);
-    const action = url.searchParams.get('action');
+    const requestBody = await req.json();
+    console.log('Request body received:', requestBody);
+    
+    const { action, chiefComplaint } = requestBody;
+    
+    if (!action) {
+      throw new Error('Action parameter is required');
+    }
+    
+    if (!chiefComplaint) {
+      throw new Error('Chief complaint is required');
+    }
+
+    console.log(`Processing action: ${action} for chief complaint: ${chiefComplaint}`);
 
     if (action === 'generate-questions') {
-      const { chiefComplaint, previousAnswers = {} }: GenerateQuestionsRequest = await req.json();
+      const { previousAnswers = {} }: GenerateQuestionsRequest = requestBody;
+      
+      console.log(`Generating questions for: "${chiefComplaint}"`);
       
       const systemPrompt = `You are a clinical AI assistant helping to generate focused medical history questions for a patient presenting with "${chiefComplaint}".
 
@@ -51,7 +67,7 @@ Return a JSON array of question objects with this exact format:
   }
 ]
 
-Make questions specific to the chief complaint. For pain complaints, include severity scale questions. For timing questions, use appropriate time ranges. Keep questions clinically relevant and focused.`;
+Make questions specific to the chief complaint "${chiefComplaint}". For pain complaints, include severity scale questions. For timing questions, use appropriate time ranges. Keep questions clinically relevant and focused.`;
 
       const userPrompt = `Chief complaint: ${chiefComplaint}
 ${Object.keys(previousAnswers).length > 0 ? `Previous answers: ${JSON.stringify(previousAnswers)}` : ''}
@@ -97,7 +113,9 @@ Generate focused clinical questions for this presentation.`;
     }
 
     if (action === 'generate-differential') {
-      const { chiefComplaint, answers, rosData = {} }: GenerateDifferentialRequest = await req.json();
+      const { answers, rosData = {} }: GenerateDifferentialRequest = requestBody;
+
+      console.log(`Generating differential diagnosis for: "${chiefComplaint}"`);
 
       const systemPrompt = `You are a clinical AI assistant generating differential diagnoses. Analyze the patient presentation and provide the most likely diagnoses with clinical reasoning.
 
