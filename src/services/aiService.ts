@@ -1,3 +1,4 @@
+
 // ABOUTME: AI service for clinical question generation and differential diagnosis
 // ABOUTME: Uses OpenRouter API through Supabase Edge Functions for real AI capabilities
 import { supabase } from '@/integrations/supabase/client';
@@ -73,24 +74,18 @@ export class AIService {
     try {
       console.log(`Generating AI questions for: ${chiefComplaint}`);
       
-      const response = await fetch(`https://wrfrrpgewetndgnxqmso.supabase.co/functions/v1/ai-assistant?action=generate-questions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabase.supabaseKey}`,
-        },
-        body: JSON.stringify({
+      const { data, error } = await supabase.functions.invoke('ai-assistant', {
+        body: {
+          action: 'generate-questions',
           chiefComplaint,
           previousAnswers
-        }),
+        }
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      if (error) {
+        throw new Error(`Supabase function error: ${error.message}`);
       }
 
-      const data = await response.json();
-      
       if (!data?.questions) {
         throw new Error('Invalid response from AI service');
       }
@@ -119,25 +114,19 @@ export class AIService {
     try {
       console.log(`Generating AI differential diagnosis for: ${chiefComplaint}`);
       
-      const response = await fetch(`https://wrfrrpgewetndgnxqmso.supabase.co/functions/v1/ai-assistant?action=generate-differential`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabase.supabaseKey}`,
-        },
-        body: JSON.stringify({
+      const { data, error } = await supabase.functions.invoke('ai-assistant', {
+        body: {
+          action: 'generate-differential',
           chiefComplaint,
           answers,
           rosData
-        }),
+        }
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      if (error) {
+        throw new Error(`Supabase function error: ${error.message}`);
       }
 
-      const data = await response.json();
-      
       if (!data?.differentials) {
         throw new Error('Invalid response from AI service');
       }
