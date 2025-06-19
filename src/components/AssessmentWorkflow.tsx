@@ -1,9 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
-import { Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { AIService } from '@/services/aiService';
 import { Question } from '@/types/medical';
 import { useMedical } from '@/context/MedicalContext';
@@ -12,7 +10,11 @@ import { ReviewOfSystemsComponent } from './ReviewOfSystemsComponent';
 import { PastMedicalHistory } from './PastMedicalHistory';
 import { PhysicalExamination } from './PhysicalExamination';
 import { ClinicalSummary } from './ClinicalSummary';
-import { useSaveQuestions, useSaveAnswer, useUpdateAssessmentStep } from '@/hooks/useAssessment';
+import { AssessmentProgress } from './AssessmentProgress';
+import { AssessmentHeader } from './AssessmentHeader';
+import { LoadingState } from './LoadingState';
+import { useStepManager } from './StepManager';
+import { useSaveQuestions, useSaveAnswer } from '@/hooks/useAssessment';
 
 interface AssessmentWorkflowProps {
   chiefComplaint: string;
@@ -34,7 +36,7 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
 
   const saveQuestionsMutation = useSaveQuestions();
   const saveAnswerMutation = useSaveAnswer();
-  const updateStepMutation = useUpdateAssessmentStep();
+  const { updateStep } = useStepManager();
 
   const steps = [
     'History of Present Illness',
@@ -56,7 +58,6 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
       const generatedQuestions = await AIService.generateQuestions(chiefComplaint);
       setQuestions(generatedQuestions);
       
-      // Save questions to database if we have a current assessment
       if (state.currentAssessment && !questionsGenerated) {
         console.log('Saving questions to database for assessment:', state.currentAssessment.id);
         await saveQuestionsMutation.mutateAsync({
@@ -68,14 +69,12 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
     } catch (err) {
       console.error('Error loading questions:', err);
       setError('Failed to load AI-generated questions. Using fallback questions.');
-      // Fallback questions would be loaded here
     } finally {
       setLoading(false);
     }
   };
 
   const handleAnswerSubmit = async (questionId: string, answer: any) => {
-    // Save to context
     dispatch({
       type: 'ADD_ANSWER',
       payload: {
@@ -88,7 +87,6 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
       }
     });
 
-    // Save to database
     if (state.currentAssessment) {
       try {
         await saveAnswerMutation.mutateAsync({
@@ -109,36 +107,18 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(prev => prev + 1);
     } else {
-      // Move to ROS
       setShowROS(true);
-      dispatch({ type: 'SET_STEP', payload: 2 });
-      
-      // Update assessment step in database
-      if (state.currentAssessment) {
-        await updateStepMutation.mutateAsync({
-          assessmentId: state.currentAssessment.id,
-          step: 2
-        });
-      }
+      await updateStep(2);
     }
   };
 
   const handleROSComplete = async () => {
     setShowROS(false);
     setShowPMH(true);
-    dispatch({ type: 'SET_STEP', payload: 3 });
-    
-    // Update assessment step in database
-    if (state.currentAssessment) {
-      await updateStepMutation.mutateAsync({
-        assessmentId: state.currentAssessment.id,
-        step: 3
-      });
-    }
+    await updateStep(3);
   };
 
   const handlePMHComplete = async (pmhData: any) => {
-    // Store PMH data in context
     dispatch({
       type: 'SET_PMH_DATA',
       payload: pmhData
@@ -146,19 +126,10 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
     
     setShowPMH(false);
     setShowPE(true);
-    dispatch({ type: 'SET_STEP', payload: 4 });
-    
-    // Update assessment step in database
-    if (state.currentAssessment) {
-      await updateStepMutation.mutateAsync({
-        assessmentId: state.currentAssessment.id,
-        step: 4
-      });
-    }
+    await updateStep(4);
   };
 
   const handlePEComplete = async (peData: any) => {
-    // Store PE data in context
     dispatch({
       type: 'SET_PE_DATA',
       payload: peData
@@ -166,15 +137,7 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
     
     setShowPE(false);
     setShowSummary(true);
-    dispatch({ type: 'SET_STEP', payload: 5 });
-    
-    // Update assessment step in database
-    if (state.currentAssessment) {
-      await updateStepMutation.mutateAsync({
-        assessmentId: state.currentAssessment.id,
-        step: 5
-      });
-    }
+    await updateStep(5);
   };
 
   const handleSummaryComplete = () => {
@@ -184,17 +147,7 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
   const progressPercent = showSummary ? 100 : showPE ? 80 : showPMH ? 60 : showROS ? 40 : (currentQuestionIndex / Math.max(questions.length, 1)) * 30;
 
   if (loading) {
-    return (
-      <div className="p-6">
-        <Card className="max-w-4xl mx-auto">
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-teal-600 mb-4" />
-            <p className="text-lg">Generating personalized questions...</p>
-            <p className="text-sm text-gray-600">AI is analyzing the chief complaint</p>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <LoadingState />;
   }
 
   if (showSummary) {
@@ -255,27 +208,14 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
     <div className="p-6">
       <Card className="max-w-4xl mx-auto">
         <CardHeader>
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <CardTitle className="text-2xl">Clinical Assessment</CardTitle>
-              <p className="text-gray-600">Chief Complaint: <span className="font-medium">{chiefComplaint}</span></p>
-            </div>
-            <div className="text-right">
-              <p className="text-sm text-gray-600">
-                Step {state.currentStep} of {steps.length}
-              </p>
-              <p className="font-medium">{steps[state.currentStep - 1]}</p>
-            </div>
-          </div>
-          
-          <Progress value={progressPercent} className="w-full" />
-          
-          {error && (
-            <div className="flex items-center space-x-2 text-amber-600 bg-amber-50 p-3 rounded-lg">
-              <AlertCircle className="h-4 w-4" />
-              <span className="text-sm">{error}</span>
-            </div>
-          )}
+          <AssessmentHeader chiefComplaint={chiefComplaint} error={error} />
+          <AssessmentProgress
+            currentStep={state.currentStep}
+            totalSteps={steps.length}
+            steps={steps}
+            progressPercent={progressPercent}
+            answersCount={Object.keys(state.answers).length}
+          />
         </CardHeader>
 
         <CardContent>
@@ -295,11 +235,6 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
             >
               {currentQuestionIndex > 0 ? 'Previous Question' : 'Back to Chief Complaint'}
             </Button>
-            
-            <div className="flex items-center space-x-2 text-sm text-gray-600">
-              <CheckCircle className="h-4 w-4 text-green-600" />
-              <span>{Object.keys(state.answers).length} questions answered</span>
-            </div>
           </div>
         </CardContent>
       </Card>
