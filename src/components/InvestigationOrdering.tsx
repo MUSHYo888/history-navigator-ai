@@ -13,7 +13,7 @@ import {
   Beaker, 
   Scan, 
   Heart, 
-  Lungs, 
+  Wind, 
   AlertTriangle, 
   Clock, 
   DollarSign,
@@ -149,7 +149,7 @@ export function InvestigationOrdering({
       case 'laboratory': return <Beaker className="h-4 w-4" />;
       case 'imaging': return <Scan className="h-4 w-4" />;
       case 'cardiac': return <Heart className="h-4 w-4" />;
-      case 'pulmonary': return <Lungs className="h-4 w-4" />;
+      case 'pulmonary': return <Wind className="h-4 w-4" />;
       default: return <Brain className="h-4 w-4" />;
     }
   };
