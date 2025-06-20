@@ -5,12 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Brain, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Loader2, Brain, AlertTriangle, CheckCircle, Activity } from 'lucide-react';
 import { AIService } from '@/services/aiService';
 import { DifferentialDiagnosis } from '@/types/medical';
 import { useMedical } from '@/context/MedicalContext';
 import { useCompleteAssessment } from '@/hooks/useAssessment';
 import { toast } from 'sonner';
+import { AdvancedClinicalSupport } from './AdvancedClinicalSupport';
 
 interface ClinicalSummaryProps {
   chiefComplaint: string;
@@ -21,6 +22,7 @@ interface ClinicalSummaryProps {
 export function ClinicalSummary({ chiefComplaint, onComplete, onBack }: ClinicalSummaryProps) {
   const { state } = useMedical();
   const [differentials, setDifferentials] = useState<DifferentialDiagnosis[]>([]);
+  const [advancedSupport, setAdvancedSupport] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showInvestigations, setShowInvestigations] = useState(false);
@@ -29,6 +31,7 @@ export function ClinicalSummary({ chiefComplaint, onComplete, onBack }: Clinical
 
   useEffect(() => {
     generateDifferentials();
+    generateAdvancedSupport();
   }, []);
 
   const generateDifferentials = async () => {
@@ -54,6 +57,24 @@ export function ClinicalSummary({ chiefComplaint, onComplete, onBack }: Clinical
       setError('Failed to generate differential diagnosis. Using clinical reasoning based on available data.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const generateAdvancedSupport = async () => {
+    try {
+      console.log('Generating advanced clinical decision support');
+      
+      const support = await AIService.generateAdvancedClinicalSupport(
+        chiefComplaint,
+        state.answers,
+        state.rosData,
+        state.peData?.vitalSigns,
+        { age: 45 } // You might want to get this from patient data
+      );
+      
+      setAdvancedSupport(support);
+    } catch (error) {
+      console.error('Error generating advanced support:', error);
     }
   };
 
@@ -155,6 +176,17 @@ export function ClinicalSummary({ chiefComplaint, onComplete, onBack }: Clinical
         </CardHeader>
 
         <CardContent className="space-y-6">
+          {/* Advanced Clinical Decision Support */}
+          {advancedSupport && (
+            <div>
+              <h3 className="text-xl font-semibold mb-4 flex items-center">
+                <Activity className="h-5 w-5 text-purple-600 mr-2" />
+                Advanced Clinical Decision Support
+              </h3>
+              <AdvancedClinicalSupport clinicalSupport={advancedSupport} />
+            </div>
+          )}
+
           {/* Assessment Data Summary */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <Card className="border-l-4 border-l-blue-500">

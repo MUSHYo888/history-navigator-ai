@@ -1,7 +1,8 @@
 // ABOUTME: AI service for clinical question generation and differential diagnosis
 // ABOUTME: Uses OpenRouter API through Supabase Edge Functions for real AI capabilities
 import { supabase } from '@/integrations/supabase/client';
-import { Question, DifferentialDiagnosis } from '@/types/medical';
+import { Question, DifferentialDiagnosis, AdvancedClinicalSupport } from '@/types/medical';
+import { ClinicalScoringService } from '@/services/clinicalScoringService';
 
 export class AIService {
   // Comprehensive fallback questions for different chief complaints
@@ -502,6 +503,216 @@ export class AIService {
       
       return mockSupport;
     }
+  }
+
+  static async generateAdvancedClinicalSupport(
+    chiefComplaint: string,
+    answers: Record<string, any>,
+    rosData: Record<string, any>,
+    vitalSigns?: any,
+    demographics?: any
+  ): Promise<AdvancedClinicalSupport> {
+    try {
+      console.log(`Generating advanced clinical support for: ${chiefComplaint}`);
+      
+      // Extract relevant data
+      const age = demographics?.age || 50; // Default age if not provided
+      const vitals = vitalSigns || {
+        systolicBP: 120,
+        diastolicBP: 80,
+        heartRate: 80,
+        respiratoryRate: 16,
+        temperature: 37,
+        oxygenSaturation: 98
+      };
+
+      // Calculate severity scores based on chief complaint and data
+      const severityScores = this.calculateRelevantScores(chiefComplaint, answers, vitals, age);
+      
+      // Assess overall risk
+      const riskAssessment = ClinicalScoringService.assessOverallRisk(
+        age,
+        vitals,
+        this.extractComorbidities(rosData),
+        Object.values(answers).map(a => String(a.value))
+      );
+
+      // Generate clinical alerts
+      const clinicalAlerts = this.generateClinicalAlerts(chiefComplaint, answers, vitals, severityScores);
+
+      // Generate triage recommendation
+      const triageRecommendation = ClinicalScoringService.generateTriageRecommendation(
+        riskAssessment.overallRisk,
+        severityScores,
+        clinicalAlerts
+      );
+
+      return {
+        severityScores,
+        riskAssessment,
+        triageRecommendation,
+        clinicalAlerts
+      };
+
+    } catch (error) {
+      console.error('Error generating advanced clinical support:', error);
+      
+      // Return fallback support
+      return this.getFallbackAdvancedSupport(chiefComplaint);
+    }
+  }
+
+  private static calculateRelevantScores(
+    chiefComplaint: string,
+    answers: Record<string, any>,
+    vitals: any,
+    age: number
+  ) {
+    const scores = [];
+    const complaint = chiefComplaint.toLowerCase();
+
+    // qSOFA for sepsis risk
+    if (complaint.includes('fever') || complaint.includes('infection') || complaint.includes('sepsis')) {
+      const qsofa = ClinicalScoringService.calculateQSOFA(
+        vitals.systolicBP,
+        vitals.respiratoryRate,
+        15 // Assume normal GCS unless indicated otherwise
+      );
+      scores.push(qsofa);
+    }
+
+    // CURB-65 for pneumonia
+    if (complaint.includes('cough') || complaint.includes('pneumonia') || complaint.includes('chest')) {
+      const curb65 = ClinicalScoringService.calculateCURB65(
+        false, // Assume no confusion unless specified
+        5, // Normal urea
+        vitals.respiratoryRate,
+        vitals.systolicBP,
+        vitals.diastolicBP,
+        age
+      );
+      scores.push(curb65);
+    }
+
+    // Wells Score for PE
+    if (complaint.includes('chest pain') || complaint.includes('shortness of breath') || complaint.includes('breathless')) {
+      const wellsPE = ClinicalScoringService.calculateWellsPE(
+        true, // Assume clinical signs present
+        true, // Alternative diagnosis likely
+        vitals.heartRate,
+        false, // No recent immobilization
+        false, // No previous PE
+        false, // No hemoptysis
+        false // No active malignancy
+      );
+      scores.push(wellsPE);
+    }
+
+    return scores;
+  }
+
+  private static extractComorbidities(rosData: Record<string, any>): string[] {
+    const comorbidities = [];
+    
+    // Extract from ROS data
+    Object.entries(rosData).forEach(([system, data]: [string, any]) => {
+      if (data.positive && Array.isArray(data.positive)) {
+        comorbidities.push(...data.positive);
+      }
+    });
+
+    return comorbidities;
+  }
+
+  private static generateClinicalAlerts(
+    chiefComplaint: string,
+    answers: Record<string, any>,
+    vitals: any,
+    severityScores: any[]
+  ) {
+    const alerts = [];
+
+    // Vital signs alerts
+    if (vitals.systolicBP < 90) {
+      alerts.push({
+        id: 'hypotension',
+        type: 'critical',
+        title: 'Critical Hypotension',
+        message: 'Systolic BP < 90 mmHg indicates hemodynamic compromise',
+        triggeredBy: ['vital signs'],
+        actions: ['IV access', 'Fluid resuscitation', 'Urgent physician review']
+      });
+    }
+
+    if (vitals.heartRate > 120) {
+      alerts.push({
+        id: 'tachycardia',
+        type: 'warning',
+        title: 'Significant Tachycardia',
+        message: 'Heart rate > 120 bpm may indicate stress response or pathology',
+        triggeredBy: ['vital signs'],
+        actions: ['ECG', 'Continuous monitoring', 'Assess for underlying cause']
+      });
+    }
+
+    if (vitals.oxygenSaturation < 92) {
+      alerts.push({
+        id: 'hypoxia',
+        type: 'critical',
+        title: 'Severe Hypoxia',
+        message: 'Oxygen saturation < 92% requires immediate intervention',
+        triggeredBy: ['vital signs'],
+        actions: ['High-flow oxygen', 'ABG analysis', 'Consider ventilatory support']
+      });
+    }
+
+    // High severity score alerts
+    severityScores.forEach(score => {
+      if (score.riskLevel === 'high' || score.riskLevel === 'critical') {
+        alerts.push({
+          id: `score-${score.id}`,
+          type: score.riskLevel === 'critical' ? 'critical' : 'warning',
+          title: `High ${score.name}`,
+          message: `${score.interpretation}`,
+          triggeredBy: [score.name],
+          actions: score.recommendations
+        });
+      }
+    });
+
+    return alerts;
+  }
+
+  private static getFallbackAdvancedSupport(chiefComplaint: string): AdvancedClinicalSupport {
+    return {
+      severityScores: [],
+      riskAssessment: {
+        overallRisk: 'moderate',
+        riskScore: 3,
+        maxRiskScore: 10,
+        riskFactors: [
+          {
+            factor: 'Presenting complaint requires evaluation',
+            present: true,
+            weight: 3,
+            description: 'Patient requires clinical assessment'
+          }
+        ],
+        recommendations: [
+          'Clinical assessment required',
+          'Monitor vital signs',
+          'Consider basic investigations'
+        ]
+      },
+      triageRecommendation: {
+        priority: 'urgent',
+        timeframe: 'Within 30 minutes',
+        location: 'emergency',
+        reasoning: 'Standard triage for presenting complaint',
+        immediateActions: ['Basic observations', 'Nursing assessment']
+      },
+      clinicalAlerts: []
+    };
   }
 
   private static getMockInvestigations(chiefComplaint: string): any[] {
