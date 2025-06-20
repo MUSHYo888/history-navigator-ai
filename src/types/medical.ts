@@ -1,4 +1,3 @@
-
 export interface Patient {
   id: string;
   name: string;
@@ -61,4 +60,47 @@ export interface ClinicalSummary {
   investigations: string[];
   differentialDiagnoses: DifferentialDiagnosis[];
   plan: string;
+}
+
+export interface Investigation {
+  id: string;
+  name: string;
+  type: 'laboratory' | 'imaging' | 'cardiac' | 'pulmonary' | 'other';
+  category: string;
+  indication: string;
+  urgency: 'routine' | 'urgent' | 'stat';
+  cost: 'low' | 'moderate' | 'high';
+  rationale: string;
+  expectedFindings?: string;
+}
+
+export interface InvestigationRecommendation {
+  investigation: Investigation;
+  priority: number;
+  clinicalRationale: string;
+  contraindications?: string[];
+  alternatives?: string[];
+}
+
+export interface RedFlag {
+  condition: string;
+  severity: 'high' | 'medium' | 'low';
+  description: string;
+  immediateActions: string[];
+}
+
+export interface ClinicalGuideline {
+  title: string;
+  source: string;
+  recommendation: string;
+  evidenceLevel: 'A' | 'B' | 'C' | 'D';
+  applicableConditions: string[];
+}
+
+export interface ClinicalDecisionSupport {
+  investigations: InvestigationRecommendation[];
+  redFlags: RedFlag[];
+  guidelines: ClinicalGuideline[];
+  treatmentRecommendations: string[];
+  followUpRecommendations: string[];
 }

@@ -456,4 +456,169 @@ export class AIService {
       return mockDiagnoses[complaint] || mockDiagnoses['fatigue'];
     }
   }
+
+  static async generateClinicalDecisionSupport(
+    chiefComplaint: string,
+    differentialDiagnoses: any[],
+    answers: Record<string, any>,
+    rosData?: Record<string, any>
+  ): Promise<any> {
+    try {
+      console.log(`Generating clinical decision support for: ${chiefComplaint}`);
+      
+      const { data, error } = await supabase.functions.invoke('ai-assistant', {
+        body: {
+          action: 'generate-clinical-support',
+          chiefComplaint,
+          differentialDiagnoses,
+          answers,
+          rosData
+        }
+      });
+
+      if (error) {
+        throw new Error(`Supabase function error: ${error.message}`);
+      }
+
+      if (!data?.clinicalSupport) {
+        throw new Error('Invalid response from AI service');
+      }
+
+      console.log(`AI generated clinical decision support`);
+      return data.clinicalSupport;
+
+    } catch (error) {
+      console.error('Error generating clinical decision support:', error);
+      console.log('Falling back to mock clinical support');
+      
+      // Fallback to mock clinical support
+      const mockSupport: any = {
+        investigations: this.getMockInvestigations(chiefComplaint),
+        redFlags: this.getMockRedFlags(chiefComplaint),
+        guidelines: this.getMockGuidelines(chiefComplaint),
+        treatmentRecommendations: [],
+        followUpRecommendations: []
+      };
+      
+      return mockSupport;
+    }
+  }
+
+  private static getMockInvestigations(chiefComplaint: string): any[] {
+    const mockInvestigations: Record<string, any[]> = {
+      'chest pain': [
+        {
+          investigation: {
+            id: 'ecg',
+            name: 'ECG',
+            type: 'cardiac',
+            category: 'Cardiac',
+            indication: 'Rule out acute coronary syndrome',
+            urgency: 'stat',
+            cost: 'low',
+            rationale: 'Essential for detecting acute ST changes or arrhythmias'
+          },
+          priority: 1,
+          clinicalRationale: 'First-line investigation for chest pain to rule out MI'
+        },
+        {
+          investigation: {
+            id: 'troponin',
+            name: 'Troponin T/I',
+            type: 'laboratory',
+            category: 'Cardiac Markers',
+            indication: 'Detect myocardial injury',
+            urgency: 'stat',
+            cost: 'moderate',
+            rationale: 'Gold standard for myocardial injury detection'
+          },
+          priority: 2,
+          clinicalRationale: 'Elevated troponin indicates myocardial injury'
+        }
+      ],
+      'fatigue': [
+        {
+          investigation: {
+            id: 'fbc',
+            name: 'Full Blood Count',
+            type: 'laboratory',
+            category: 'Hematology',
+            indication: 'Screen for anemia, infection',
+            urgency: 'routine',
+            cost: 'low',
+            rationale: 'Common cause of fatigue is anemia'
+          },
+          priority: 1,
+          clinicalRationale: 'Anemia is a common reversible cause of fatigue'
+        },
+        {
+          investigation: {
+            id: 'tft',
+            name: 'Thyroid Function Tests',
+            type: 'laboratory',
+            category: 'Endocrine',
+            indication: 'Rule out thyroid dysfunction',
+            urgency: 'routine',
+            cost: 'moderate',
+            rationale: 'Thyroid disorders commonly present with fatigue'
+          },
+          priority: 2,
+          clinicalRationale: 'Both hypo- and hyperthyroidism can cause fatigue'
+        }
+      ]
+    };
+
+    const complaint = chiefComplaint.toLowerCase();
+    return mockInvestigations[complaint] || mockInvestigations['fatigue'];
+  }
+
+  private static getMockRedFlags(chiefComplaint: string): any[] {
+    const mockRedFlags: Record<string, any[]> = {
+      'chest pain': [
+        {
+          condition: 'Acute Coronary Syndrome',
+          severity: 'high',
+          description: 'Chest pain with cardiovascular risk factors',
+          immediateActions: ['Obtain ECG within 10 minutes', 'Start cardiac monitoring', 'Prepare for emergency intervention']
+        }
+      ],
+      'fatigue': [
+        {
+          condition: 'Severe Anemia',
+          severity: 'medium',
+          description: 'Profound fatigue with possible hemodynamic compromise',
+          immediateActions: ['Check vital signs', 'Urgent FBC', 'Consider blood transfusion if Hb <7g/dL']
+        }
+      ]
+    };
+
+    const complaint = chiefComplaint.toLowerCase();
+    return mockRedFlags[complaint] || [];
+  }
+
+  private static getMockGuidelines(chiefComplaint: string): any[] {
+    const mockGuidelines: Record<string, any[]> = {
+      'chest pain': [
+        {
+          title: 'ESC Guidelines for Acute Coronary Syndromes',
+          source: 'European Society of Cardiology 2023',
+          recommendation: 'ECG should be performed within 10 minutes of presentation for all patients with chest pain',
+          evidenceLevel: 'A',
+          applicableConditions: ['Chest Pain', 'Acute Coronary Syndrome']
+        }
+      ],
+      'fatigue': [
+        {
+          title: 'NICE Guidelines for Fatigue',
+          source: 'NICE Clinical Knowledge Summary',
+          recommendation: 'Initial investigations for unexplained fatigue should include FBC, ferritin, TFTs, and glucose',
+          evidenceLevel: 'B',
+          applicableConditions: ['Fatigue', 'Tiredness']
+        }
+      ]
+    };
+
+    const complaint = chiefComplaint.toLowerCase();
+    return mockGuidelines[complaint] || [];
+  }
 }

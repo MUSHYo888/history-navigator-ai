@@ -1,7 +1,6 @@
-
 // ABOUTME: Clinical summary component displaying AI-generated differential diagnoses
 // ABOUTME: Shows assessment results, differential diagnoses with probabilities and clinical reasoning
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -24,6 +23,7 @@ export function ClinicalSummary({ chiefComplaint, onComplete, onBack }: Clinical
   const [differentials, setDifferentials] = useState<DifferentialDiagnosis[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showInvestigations, setShowInvestigations] = useState(false);
   
   const completeAssessmentMutation = useCompleteAssessment();
 
@@ -71,6 +71,23 @@ export function ClinicalSummary({ chiefComplaint, onComplete, onBack }: Clinical
     }
   };
 
+  const handleProceedToInvestigations = () => {
+    setShowInvestigations(true);
+  };
+
+  const handleInvestigationsSubmit = (selectedInvestigations: string[], notes: string) => {
+    // Save investigation data to context
+    console.log('Investigation orders:', selectedInvestigations, notes);
+    // You could dispatch this to context if needed
+    
+    // Proceed to complete assessment
+    handleCompleteAssessment();
+  };
+
+  const handleInvestigationsBack = () => {
+    setShowInvestigations(false);
+  };
+
   const getProbabilityColor = (probability: number) => {
     if (probability >= 70) return 'bg-red-500';
     if (probability >= 50) return 'bg-orange-500';
@@ -96,6 +113,25 @@ export function ClinicalSummary({ chiefComplaint, onComplete, onBack }: Clinical
           </CardContent>
         </Card>
       </div>
+    );
+  }
+
+  if (showInvestigations) {
+    const InvestigationOrdering = React.lazy(() => 
+      import('./InvestigationOrdering').then(module => ({ default: module.InvestigationOrdering }))
+    );
+    
+    return (
+      <React.Suspense fallback={<div>Loading...</div>}>
+        <InvestigationOrdering
+          chiefComplaint={chiefComplaint}
+          differentialDiagnoses={differentials}
+          answers={state.answers}
+          rosData={state.rosData}
+          onSubmit={handleInvestigationsSubmit}
+          onBack={handleInvestigationsBack}
+        />
+      </React.Suspense>
     );
   }
 
@@ -303,6 +339,12 @@ export function ClinicalSummary({ chiefComplaint, onComplete, onBack }: Clinical
               >
                 {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                 Regenerate Assessment
+              </Button>
+              <Button 
+                onClick={handleProceedToInvestigations}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                Order Investigations
               </Button>
               <Button 
                 onClick={handleCompleteAssessment}

@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
@@ -175,6 +174,106 @@ Generate differential diagnoses with clinical reasoning.`;
       console.log(`Generated ${differentials.length} differential diagnoses for: ${chiefComplaint}`);
 
       return new Response(JSON.stringify({ differentials }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (action === 'generate-clinical-support') {
+      const { differentialDiagnoses, answers, rosData = {} } = requestBody;
+
+      console.log(`Generating clinical decision support for: "${chiefComplaint}"`);
+
+      const systemPrompt = `You are a clinical AI assistant providing investigation recommendations and clinical decision support. Analyze the patient presentation and provide structured clinical guidance.
+
+Return a JSON object with this exact format:
+{
+  "investigations": [
+    {
+      "investigation": {
+        "id": "unique_id",
+        "name": "Investigation Name",
+        "type": "laboratory|imaging|cardiac|pulmonary|other",
+        "category": "Category",
+        "indication": "Clinical indication",
+        "urgency": "routine|urgent|stat",
+        "cost": "low|moderate|high",
+        "rationale": "Scientific rationale"
+      },
+      "priority": 1,
+      "clinicalRationale": "Why this test is recommended",
+      "contraindications": ["contraindication1", "contraindication2"]
+    }
+  ],
+  "redFlags": [
+    {
+      "condition": "Condition name",
+      "severity": "high|medium|low",
+      "description": "Description of the red flag",
+      "immediateActions": ["action1", "action2"]
+    }
+  ],
+  "guidelines": [
+    {
+      "title": "Guideline title",
+      "source": "Guideline source",
+      "recommendation": "Specific recommendation",
+      "evidenceLevel": "A|B|C|D",
+      "applicableConditions": ["condition1", "condition2"]
+    }
+  ],
+  "treatmentRecommendations": ["treatment1", "treatment2"],
+  "followUpRecommendations": ["followup1", "followup2"]
+}
+
+Provide evidence-based recommendations prioritized by clinical importance and cost-effectiveness.`;
+
+      const userPrompt = `Chief complaint: ${chiefComplaint}
+
+Differential diagnoses:
+${JSON.stringify(differentialDiagnoses, null, 2)}
+
+Patient answers to history questions:
+${JSON.stringify(answers, null, 2)}
+
+Review of Systems findings:
+${JSON.stringify(rosData, null, 2)}
+
+Generate comprehensive clinical decision support including investigation recommendations, red flag identification, and clinical guidelines.`;
+
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openRouterApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'anthropic/claude-3.5-sonnet',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+          ],
+          temperature: 0.2,
+          max_tokens: 4000
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`OpenRouter API error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const aiResponse = data.choices[0].message.content;
+      
+      // Extract JSON from the response
+      const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('Invalid AI response format');
+      }
+
+      const clinicalSupport = JSON.parse(jsonMatch[0]);
+      console.log(`Generated clinical decision support for: ${chiefComplaint}`);
+
+      return new Response(JSON.stringify({ clinicalSupport }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
