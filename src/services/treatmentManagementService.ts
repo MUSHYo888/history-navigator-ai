@@ -1,4 +1,3 @@
-
 // ABOUTME: Treatment and management recommendation service with medication suggestions and pathways
 // ABOUTME: Provides drug interaction checking, treatment pathways, and discharge planning
 
@@ -81,14 +80,27 @@ export class TreatmentManagementService {
     const instructions = this.generateDischargeInstructions(condition, treatmentReceived);
     const followUp = this.generateFollowUpPlan(condition, treatmentReceived);
     
+    // Determine continuing vs new medications based on duration
+    const continuingMedications = currentMedications.filter(med => 
+      med.duration.toLowerCase().includes('long term') || 
+      med.duration.toLowerCase().includes('ongoing') ||
+      med.duration.toLowerCase().includes('chronic')
+    );
+    
+    const newPrescriptions = currentMedications.filter(med => 
+      !med.duration.toLowerCase().includes('long term') && 
+      !med.duration.toLowerCase().includes('ongoing') &&
+      !med.duration.toLowerCase().includes('chronic')
+    );
+    
     return {
       planId: `discharge-${patientId}-${Date.now()}`,
       patientId,
       condition,
       dischargeReadiness,
       medications: {
-        continuing: currentMedications.filter(med => med.category !== 'acute'),
-        newPrescriptions: currentMedications.filter(med => med.category === 'acute'),
+        continuing: continuingMedications,
+        newPrescriptions: newPrescriptions,
         discontinued: [],
         changes: []
       },
