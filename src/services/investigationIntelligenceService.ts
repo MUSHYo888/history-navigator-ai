@@ -20,17 +20,17 @@ export class InvestigationIntelligenceService {
   ): CostBenefitAnalysis {
     // Cost database - in real implementation, this would come from healthcare pricing databases
     const costDatabase: Record<string, any> = {
-      'ecg': { cost: 50, category: 'very-low', yield: 85 },
-      'troponin': { cost: 120, category: 'low', yield: 75 },
-      'fbc': { cost: 30, category: 'very-low', yield: 60 },
-      'tft': { cost: 80, category: 'low', yield: 70 },
-      'chest-xray': { cost: 150, category: 'low', yield: 65 },
-      'ct-chest': { cost: 800, category: 'high', yield: 90 },
-      'mri-brain': { cost: 1200, category: 'very-high', yield: 95 },
-      'echo': { cost: 300, category: 'moderate', yield: 80 }
+      'ecg': { cost: 50, category: 'very-low', diagnosticYield: 85 },
+      'troponin': { cost: 120, category: 'low', diagnosticYield: 75 },
+      'fbc': { cost: 30, category: 'very-low', diagnosticYield: 60 },
+      'tft': { cost: 80, category: 'low', diagnosticYield: 70 },
+      'chest-xray': { cost: 150, category: 'low', diagnosticYield: 65 },
+      'ct-chest': { cost: 800, category: 'high', diagnosticYield: 90 },
+      'mri-brain': { cost: 1200, category: 'very-high', diagnosticYield: 95 },
+      'echo': { cost: 300, category: 'moderate', diagnosticYield: 80 }
     };
 
-    const costData = costDatabase[investigationId] || { cost: 200, category: 'moderate', yield: 70 };
+    const costData = costDatabase[investigationId] || { cost: 200, category: 'moderate', diagnosticYield: 70 };
     
     // Calculate clinical benefit based on patient presentation
     const clinicalBenefit = this.calculateClinicalBenefit(investigationId, patientData, clinicalContext);
