@@ -3,7 +3,7 @@
 // ABOUTME: Handles CRUD operations for reports, SOAP notes, referral letters, and progress notes
 
 import { supabase } from '@/integrations/supabase/client';
-import { ClinicalReport, ReferralLetter, SOAPNote, ProgressNote, ReportTemplate } from '@/types/reporting';
+import { ClinicalReport, ReferralLetter, SOAPNote, ProgressNote, ReportTemplate, ReportContent, ReferralLetterContent } from '@/types/reporting';
 
 export class ClinicalReportService {
   static async createClinicalReport(
@@ -34,14 +34,14 @@ export class ClinicalReportService {
     return {
       id: data.id,
       assessmentId: data.assessment_id,
-      reportType: data.report_type,
+      reportType: data.report_type as 'clinical_summary' | 'investigation_summary' | 'treatment_plan' | 'discharge_summary',
       title: data.title,
-      content: data.content,
+      content: data.content as ReportContent,
       generatedAt: data.generated_at,
       generatedBy: data.generated_by,
-      format: data.format,
+      format: data.format as 'pdf' | 'html' | 'docx',
       filePath: data.file_path,
-      metadata: data.metadata
+      metadata: (data.metadata as any) || {}
     };
   }
 
@@ -75,15 +75,15 @@ export class ClinicalReportService {
       specialty: data.specialty,
       recipientName: data.recipient_name,
       recipientFacility: data.recipient_facility,
-      urgency: data.urgency,
+      urgency: data.urgency as 'routine' | 'urgent' | 'stat',
       clinicalQuestion: data.clinical_question,
       relevantHistory: data.relevant_history,
       examinationFindings: data.examination_findings,
       investigationsCompleted: data.investigations_completed,
-      letterContent: data.letter_content,
+      letterContent: data.letter_content as ReferralLetterContent,
       createdAt: data.created_at,
       sentAt: data.sent_at,
-      status: data.status
+      status: data.status as 'draft' | 'sent' | 'acknowledged'
     };
   }
 
@@ -197,14 +197,14 @@ export class ClinicalReportService {
     return data.map(report => ({
       id: report.id,
       assessmentId: report.assessment_id,
-      reportType: report.report_type,
+      reportType: report.report_type as 'clinical_summary' | 'investigation_summary' | 'treatment_plan' | 'discharge_summary',
       title: report.title,
-      content: report.content,
+      content: report.content as ReportContent,
       generatedAt: report.generated_at,
       generatedBy: report.generated_by,
-      format: report.format,
+      format: report.format as 'pdf' | 'html' | 'docx',
       filePath: report.file_path,
-      metadata: report.metadata
+      metadata: (report.metadata as any) || {}
     }));
   }
 
@@ -258,9 +258,9 @@ export class ClinicalReportService {
     return data.map(template => ({
       id: template.id,
       name: template.name,
-      type: template.type,
+      type: template.type as 'clinical_report' | 'referral_letter' | 'soap_note' | 'progress_note',
       specialty: template.specialty,
-      templateContent: template.template_content,
+      templateContent: template.template_content as any,
       defaultTemplate: template.default_template,
       createdAt: template.created_at,
       updatedAt: template.updated_at,
