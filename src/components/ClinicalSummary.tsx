@@ -4,7 +4,8 @@
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Brain, AlertTriangle, Activity } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Loader2, Brain, AlertTriangle, Activity, FileText, Send, NotepadText } from 'lucide-react';
 import { AIService } from '@/services/aiService';
 import { DifferentialDiagnosis } from '@/types/medical';
 import { useMedical } from '@/context/MedicalContext';
@@ -15,6 +16,8 @@ import { AssessmentDataSummary } from './clinical/AssessmentDataSummary';
 import { DifferentialDiagnosisList } from './clinical/DifferentialDiagnosisList';
 import { MedicalHistorySummary } from './clinical/MedicalHistorySummary';
 import { ClinicalActionsPanel } from './clinical/ClinicalActionsPanel';
+import { PDFExportButton } from './reports/PDFExportButton';
+import { SOAPNotesEditor } from './documentation/SOAPNotesEditor';
 
 interface ClinicalSummaryProps {
   chiefComplaint: string;
@@ -29,6 +32,8 @@ export function ClinicalSummary({ chiefComplaint, onComplete, onBack }: Clinical
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showInvestigations, setShowInvestigations] = useState(false);
+  const [showSOAPEditor, setShowSOAPEditor] = useState(false);
+  const [showReferralDialog, setShowReferralDialog] = useState(false);
   
   const completeAssessmentMutation = useCompleteAssessment();
 
@@ -108,6 +113,11 @@ export function ClinicalSummary({ chiefComplaint, onComplete, onBack }: Clinical
     setShowInvestigations(false);
   };
 
+  const handleSOAPNoteSaved = () => {
+    setShowSOAPEditor(false);
+    toast.success('SOAP note documentation completed');
+  };
+
   if (loading) {
     return (
       <div className="p-6">
@@ -119,6 +129,16 @@ export function ClinicalSummary({ chiefComplaint, onComplete, onBack }: Clinical
           </CardContent>
         </Card>
       </div>
+    );
+  }
+
+  if (showSOAPEditor) {
+    return (
+      <SOAPNotesEditor
+        assessmentId={state.currentAssessment?.id || ''}
+        onSave={handleSOAPNoteSaved}
+        onCancel={() => setShowSOAPEditor(false)}
+      />
     );
   }
 
@@ -161,6 +181,45 @@ export function ClinicalSummary({ chiefComplaint, onComplete, onBack }: Clinical
         </CardHeader>
 
         <CardContent className="space-y-6">
+          {/* Documentation Actions */}
+          <div className="flex flex-wrap gap-3 p-4 bg-gray-50 rounded-lg">
+            <h3 className="w-full text-lg font-semibold text-gray-800 mb-2">
+              Clinical Documentation & Reporting
+            </h3>
+            
+            {state.currentPatient && state.currentAssessment && (
+              <PDFExportButton
+                assessmentId={state.currentAssessment.id}
+                patient={state.currentPatient}
+                chiefComplaint={chiefComplaint}
+                answers={state.answers}
+                rosData={state.rosData}
+                differentials={differentials}
+                pmhData={state.pmhData}
+                peData={state.peData}
+                variant="default"
+              />
+            )}
+            
+            <Button
+              onClick={() => setShowSOAPEditor(true)}
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              <NotepadText className="h-4 w-4" />
+              Create SOAP Note
+            </Button>
+            
+            <Button
+              onClick={() => setShowReferralDialog(true)}
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              <Send className="h-4 w-4" />
+              Generate Referral Letter
+            </Button>
+          </div>
+
           {/* Advanced Clinical Decision Support */}
           {advancedSupport && (
             <div>
