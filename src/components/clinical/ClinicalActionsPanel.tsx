@@ -4,12 +4,13 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Loader2 } from 'lucide-react';
+import { Loader2, TestTube, Pill } from 'lucide-react';
 
 interface ClinicalActionsPanelProps {
   onBack: () => void;
   onRegenerate: () => void;
   onProceedToInvestigations: () => void;
+  onProceedToTreatment: () => void;
   onCompleteAssessment: () => void;
   loading: boolean;
   completing: boolean;
@@ -19,6 +20,7 @@ export function ClinicalActionsPanel({
   onBack,
   onRegenerate,
   onProceedToInvestigations,
+  onProceedToTreatment,
   onCompleteAssessment,
   loading,
   completing
@@ -41,8 +43,18 @@ export function ClinicalActionsPanel({
         <Button 
           onClick={onProceedToInvestigations}
           className="bg-blue-600 hover:bg-blue-700"
+          disabled={loading}
         >
+          <TestTube className="h-4 w-4 mr-2" />
           Order Investigations
+        </Button>
+        <Button 
+          onClick={onProceedToTreatment}
+          className="bg-green-600 hover:bg-green-700"
+          disabled={loading}
+        >
+          <Pill className="h-4 w-4 mr-2" />
+          Treatment Plan
         </Button>
         <Button 
           onClick={onCompleteAssessment}

@@ -34,6 +34,7 @@ export function ClinicalSummary({ chiefComplaint, onComplete, onBack }: Clinical
   const [showInvestigations, setShowInvestigations] = useState(false);
   const [showSOAPEditor, setShowSOAPEditor] = useState(false);
   const [showReferralDialog, setShowReferralDialog] = useState(false);
+  const [showTreatment, setShowTreatment] = useState(false);
   
   const completeAssessmentMutation = useCompleteAssessment();
 
@@ -142,6 +143,25 @@ export function ClinicalSummary({ chiefComplaint, onComplete, onBack }: Clinical
     );
   }
 
+  if (showTreatment) {
+    const TreatmentRecommendations = React.lazy(() => 
+      import('./TreatmentRecommendations').then(module => ({ default: module.TreatmentRecommendations }))
+    );
+    
+    return (
+      <React.Suspense fallback={<div>Loading...</div>}>
+        <TreatmentRecommendations
+          condition={differentials[0]?.condition || chiefComplaint}
+          severity="moderate"
+          patientData={state.currentPatient}
+          differentialDiagnoses={differentials}
+          onBack={() => setShowTreatment(false)}
+          onComplete={handleCompleteAssessment}
+        />
+      </React.Suspense>
+    );
+  }
+
   if (showInvestigations) {
     const InvestigationOrdering = React.lazy(() => 
       import('./InvestigationOrdering').then(module => ({ default: module.InvestigationOrdering }))
@@ -154,7 +174,11 @@ export function ClinicalSummary({ chiefComplaint, onComplete, onBack }: Clinical
           differentialDiagnoses={differentials}
           answers={state.answers}
           rosData={state.rosData}
-          onSubmit={handleInvestigationsSubmit}
+          onSubmit={(investigations, notes) => {
+            console.log('Investigation orders:', investigations, notes);
+            setShowInvestigations(false);
+            setShowTreatment(true);
+          }}
           onBack={handleInvestigationsBack}
         />
       </React.Suspense>
@@ -253,6 +277,7 @@ export function ClinicalSummary({ chiefComplaint, onComplete, onBack }: Clinical
             onBack={onBack}
             onRegenerate={generateDifferentials}
             onProceedToInvestigations={handleProceedToInvestigations}
+            onProceedToTreatment={() => setShowTreatment(true)}
             onCompleteAssessment={handleCompleteAssessment}
             loading={loading}
             completing={completeAssessmentMutation.isPending}

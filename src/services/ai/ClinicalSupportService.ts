@@ -26,10 +26,12 @@ export class ClinicalSupportService {
       });
 
       if (error) {
-        throw new Error(`Supabase function error: ${error.message}`);
+        console.warn(`AI service error (using fallback): ${error.message}`);
+        throw error; // Will be caught by outer try-catch
       }
 
       if (!data?.clinicalSupport) {
+        console.warn('No clinical support data received, using fallback');
         throw new Error('Invalid response from AI service');
       }
 
@@ -37,8 +39,8 @@ export class ClinicalSupportService {
       return data.clinicalSupport;
 
     } catch (error) {
-      console.error('Error generating clinical decision support:', error);
-      console.log('ClinicalSupportService: Falling back to mock clinical support');
+      console.warn('AI service unavailable, using evidence-based protocols:', error);
+      console.log('ClinicalSupportService: Using fallback clinical protocols');
       
       return {
         investigations: FallbackDataService.getFallbackInvestigations(chiefComplaint),

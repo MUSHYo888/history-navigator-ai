@@ -7,6 +7,7 @@ import { Dashboard } from '@/components/Dashboard';
 import { NewPatientForm } from '@/components/NewPatientForm';
 import { ChiefComplaintSelector } from '@/components/ChiefComplaintSelector';
 import { AssessmentWorkflow } from '@/components/AssessmentWorkflow';
+import { PatientList } from '@/components/PatientList';
 import { Patient, Assessment } from '@/types/medical';
 import { useMedical } from '@/context/MedicalContext';
 import { useCreateAssessment, useUpdateAssessmentStep } from '@/hooks/useAssessment';
@@ -76,6 +77,17 @@ const Index = () => {
           <Dashboard 
             onNewPatient={handleNewPatient}
             onViewPatients={() => setCurrentView('patients')}
+          />
+        )}
+
+        {currentView === 'patients' && (
+          <PatientList
+            onNewPatient={handleNewPatient}
+            onSelectPatient={(patient) => {
+              dispatch({ type: 'SET_CURRENT_PATIENT', payload: patient });
+              setCurrentView('chief-complaint');
+            }}
+            onBack={() => setCurrentView('dashboard')}
           />
         )}
         
