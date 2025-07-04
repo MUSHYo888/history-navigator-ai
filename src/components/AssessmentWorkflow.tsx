@@ -15,6 +15,7 @@ import { AssessmentHeader } from './AssessmentHeader';
 import { LoadingState } from './LoadingState';
 import { useStepManager } from './StepManager';
 import { useSaveQuestions, useSaveAnswer } from '@/hooks/useAssessment';
+import { toast } from 'sonner';
 
 interface AssessmentWorkflowProps {
   chiefComplaint: string;
@@ -33,10 +34,17 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
   const [showPE, setShowPE] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
   const [questionsGenerated, setQuestionsGenerated] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<string[]>([]);
 
   const saveQuestionsMutation = useSaveQuestions();
   const saveAnswerMutation = useSaveAnswer();
   const { updateStep } = useStepManager();
+
+  const addDebugInfo = (info: string) => {
+    const timestamp = new Date().toISOString();
+    setDebugInfo(prev => [...prev, `[${timestamp}] ${info}`]);
+    console.log(`DEBUG: ${info}`);
+  };
 
   const steps = [
     'History of Present Illness',
@@ -47,6 +55,7 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
   ];
 
   useEffect(() => {
+    addDebugInfo('AssessmentWorkflow mounted');
     loadQuestions();
   }, [chiefComplaint]);
 
@@ -54,93 +63,112 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
     try {
       setLoading(true);
       setError(null);
-      console.log('Loading questions for chief complaint:', chiefComplaint);
+      addDebugInfo(`Loading questions for chief complaint: ${chiefComplaint}`);
       
       const generatedQuestions = await AIService.generateQuestions(chiefComplaint);
-      console.log('Generated questions:', generatedQuestions.length);
+      addDebugInfo(`Generated ${generatedQuestions.length} questions`);
       setQuestions(generatedQuestions);
       
       if (state.currentAssessment && !questionsGenerated) {
-        console.log('Saving questions to database for assessment:', state.currentAssessment.id);
+        addDebugInfo(`Saving questions to database for assessment: ${state.currentAssessment.id}`);
         try {
           await saveQuestionsMutation.mutateAsync({
             assessmentId: state.currentAssessment.id,
             questions: generatedQuestions
           });
           setQuestionsGenerated(true);
-          console.log('Questions saved successfully to database');
+          addDebugInfo('Questions saved successfully to database');
         } catch (saveError) {
-          console.error('Failed to save questions to database:', saveError);
-          setError('Questions generated but failed to save. Continuing with fallback data.');
+          addDebugInfo(`Failed to save questions: ${saveError.message}`);
+          setError('Questions generated but failed to save. Assessment will continue with temporary data.');
+          toast.error('Questions could not be saved to database');
         }
       }
     } catch (err) {
-      console.error('Error loading questions:', err);
-      setError(`Failed to load questions: ${err.message || 'Unknown error'}. Using fallback questions.`);
+      addDebugInfo(`Error loading questions: ${err.message}`);
+      setError(`Failed to load questions: ${err.message || 'Unknown error'}`);
+      toast.error('Failed to generate questions. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
   const handleAnswerSubmit = async (questionId: string, answer: any) => {
-    console.log('Submitting answer:', { questionId, answer, assessmentId: state.currentAssessment?.id });
+    addDebugInfo(`Submitting answer for question ${questionId}: ${JSON.stringify(answer)}`);
     
-    // Update local state first
-    dispatch({
-      type: 'ADD_ANSWER',
-      payload: {
-        questionId,
-        answer: {
-          questionId,
-          value: answer.value,
-          notes: answer.notes
-        }
-      }
-    });
+    if (!state.currentAssessment) {
+      addDebugInfo('ERROR: No current assessment found');
+      toast.error('Assessment session lost. Please restart assessment.');
+      setError('Assessment session lost. Please restart assessment.');
+      return;
+    }
 
-    // Save to database
-    if (state.currentAssessment) {
-      try {
-        console.log('Saving answer to database...');
-        await saveAnswerMutation.mutateAsync({
-          assessmentId: state.currentAssessment.id,
+    // Validate answer format
+    if (!answer || typeof answer.value === 'undefined') {
+      addDebugInfo('ERROR: Invalid answer format');
+      toast.error('Invalid answer format. Please try again.');
+      return;
+    }
+
+    try {
+      // Update local state first
+      dispatch({
+        type: 'ADD_ANSWER',
+        payload: {
           questionId,
           answer: {
             questionId,
             value: answer.value,
             notes: answer.notes
           }
-        });
-        console.log('Answer saved successfully to database');
-      } catch (error) {
-        console.error('Failed to save answer to database:', error);
-        // Show user-friendly error
-        setError('Failed to save answer. Please try again.');
-        return; // Don't proceed if saving failed
-      }
-    } else {
-      console.error('No current assessment found');
-      setError('Assessment session lost. Please restart assessment.');
-      return;
-    }
+        }
+      });
+      addDebugInfo('Answer added to local state');
 
-    // Proceed to next question or next step
-    if (currentQuestionIndex < questions.length - 1) {
-      setCurrentQuestionIndex(prev => prev + 1);
-    } else {
-      console.log('All questions answered, proceeding to ROS');
-      setShowROS(true);
-      await updateStep(2);
+      // Save to database with comprehensive error handling
+      addDebugInfo('Attempting to save answer to database...');
+      await saveAnswerMutation.mutateAsync({
+        assessmentId: state.currentAssessment.id,
+        questionId,
+        answer: {
+          questionId,
+          value: answer.value,
+          notes: answer.notes
+        }
+      });
+      
+      addDebugInfo('Answer saved successfully to database');
+      toast.success('Answer saved successfully');
+
+      // Proceed to next question or next step
+      if (currentQuestionIndex < questions.length - 1) {
+        setCurrentQuestionIndex(prev => prev + 1);
+        addDebugInfo(`Moving to question ${currentQuestionIndex + 2}`);
+      } else {
+        addDebugInfo('All questions answered, proceeding to ROS');
+        setShowROS(true);
+        await updateStep(2);
+      }
+
+    } catch (error) {
+      addDebugInfo(`CRITICAL ERROR saving answer: ${error.message}`);
+      toast.error(`Failed to save answer: ${error.message}`);
+      setError(`Failed to save your answer: ${error.message}. Please try again.`);
+      
+      // Don't proceed if saving failed - critical for data integrity
+      return;
     }
   };
 
   const handleROSComplete = async () => {
+    addDebugInfo('ROS completed, moving to PMH');
     setShowROS(false);
     setShowPMH(true);
     await updateStep(3);
   };
 
   const handlePMHComplete = async (pmhData: any) => {
+    addDebugInfo('PMH completed, saving data');
     dispatch({
       type: 'SET_PMH_DATA',
       payload: pmhData
@@ -152,6 +180,7 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
   };
 
   const handlePEComplete = async (peData: any) => {
+    addDebugInfo('PE completed, saving data');
     dispatch({
       type: 'SET_PE_DATA',
       payload: peData
@@ -163,6 +192,7 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
   };
 
   const handleSummaryComplete = () => {
+    addDebugInfo('Assessment workflow completed');
     onComplete();
   };
 
@@ -238,6 +268,22 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
             progressPercent={progressPercent}
             answersCount={Object.keys(state.answers).length}
           />
+          
+          {/* Debug Information Panel (only shown when there are errors) */}
+          {(error || debugInfo.length > 0) && (
+            <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+              <details>
+                <summary className="cursor-pointer text-sm font-medium text-gray-700">
+                  Debug Information ({debugInfo.length} events)
+                </summary>
+                <div className="mt-2 text-xs text-gray-600 space-y-1 max-h-32 overflow-y-auto">
+                  {debugInfo.slice(-10).map((info, index) => (
+                    <div key={index} className="font-mono">{info}</div>
+                  ))}
+                </div>
+              </details>
+            </div>
+          )}
         </CardHeader>
 
         <CardContent>
@@ -257,6 +303,16 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
             >
               {currentQuestionIndex > 0 ? 'Previous Question' : 'Back to Chief Complaint'}
             </Button>
+            
+            {error && (
+              <Button 
+                onClick={loadQuestions}
+                variant="outline"
+                className="ml-4"
+              >
+                Retry Questions
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>

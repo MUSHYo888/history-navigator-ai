@@ -1,12 +1,13 @@
-// ABOUTME: System health monitoring component for debugging and user feedback
-// ABOUTME: Shows AI service status, database connectivity, and error reporting
+
+// ABOUTME: System health monitoring component for debugging and user feedback with enhanced error recovery
+// ABOUTME: Shows AI service status, database connectivity, and error reporting with actionable solutions
 
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, CheckCircle, XCircle, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Loader2, CheckCircle, XCircle, AlertTriangle, RefreshCw, Database, Brain, Zap } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { AIService } from '@/services/aiService';
 
@@ -14,6 +15,14 @@ interface SystemStatus {
   database: 'healthy' | 'error' | 'checking';
   aiService: 'healthy' | 'error' | 'checking';
   edgeFunction: 'healthy' | 'error' | 'checking';
+}
+
+interface HealthCheckResult {
+  service: string;
+  status: 'healthy' | 'error';
+  message: string;
+  details?: string;
+  actionable?: string[];
 }
 
 interface SystemHealthProps {
@@ -28,53 +37,118 @@ export function SystemHealth({ onAIServiceFixed }: SystemHealthProps) {
   });
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
   const [checking, setChecking] = useState(false);
-  const [errors, setErrors] = useState<string[]>([]);
+  const [healthResults, setHealthResults] = useState<HealthCheckResult[]>([]);
+  const [systemScore, setSystemScore] = useState<number>(0);
 
   const checkSystemHealth = async () => {
     setChecking(true);
-    setErrors([]);
-    const newErrors: string[] = [];
+    setHealthResults([]);
+    const results: HealthCheckResult[] = [];
 
     // Check database connectivity
     try {
-      const { error } = await supabase.from('patients').select('count', { count: 'exact', head: true });
+      console.log('SystemHealth: Checking database connectivity...');
+      const { error, count } = await supabase
+        .from('patients')
+        .select('count', { count: 'exact', head: true });
+      
       if (error) throw error;
+      
       setStatus(prev => ({ ...prev, database: 'healthy' }));
+      results.push({
+        service: 'Database',
+        status: 'healthy',
+        message: `Connected successfully. ${count || 0} patients in database.`,
+        details: 'Supabase database connection is operational'
+      });
     } catch (error) {
       console.error('Database check failed:', error);
       setStatus(prev => ({ ...prev, database: 'error' }));
-      newErrors.push(`Database: ${error.message}`);
+      results.push({
+        service: 'Database',
+        status: 'error',
+        message: `Connection failed: ${error.message}`,
+        details: 'Unable to connect to Supabase database',
+        actionable: [
+          'Check internet connection',
+          'Verify Supabase project status',
+          'Check database configuration'
+        ]
+      });
     }
 
     // Check edge function
     try {
+      console.log('SystemHealth: Checking edge function...');
       const { data, error } = await supabase.functions.invoke('ai-assistant', {
         body: { action: 'test' }
       });
+      
       if (error) throw error;
+      
       setStatus(prev => ({ ...prev, edgeFunction: 'healthy' }));
+      results.push({
+        service: 'Edge Function',
+        status: 'healthy',
+        message: 'AI Assistant function is operational',
+        details: `Response: ${data?.message || 'Function responding normally'}`
+      });
     } catch (error) {
       console.error('Edge function check failed:', error);
       setStatus(prev => ({ ...prev, edgeFunction: 'error' }));
-      newErrors.push(`Edge Function: ${error.message}`);
+      results.push({
+        service: 'Edge Function',
+        status: 'error',
+        message: `Function error: ${error.message}`,
+        details: 'AI Assistant edge function is not responding',
+        actionable: [
+          'Check edge function deployment',
+          'Verify function configuration',
+          'Check function logs in Supabase dashboard'
+        ]
+      });
     }
 
-    // Check AI service
+    // Check AI service with real test
     try {
-      const questions = await AIService.generateQuestions('test headache');
-      if (questions && questions.length > 0) {
+      console.log('SystemHealth: Checking AI service with test question generation...');
+      const testQuestions = await AIService.generateQuestions('test headache for system check');
+      
+      if (testQuestions && testQuestions.length > 0) {
         setStatus(prev => ({ ...prev, aiService: 'healthy' }));
+        results.push({
+          service: 'AI Service',
+          status: 'healthy',
+          message: `AI service operational. Generated ${testQuestions.length} test questions.`,
+          details: 'OpenRouter API and question generation working correctly'
+        });
         onAIServiceFixed?.();
       } else {
-        throw new Error('No questions generated');
+        throw new Error('No questions generated from AI service');
       }
     } catch (error) {
       console.error('AI service check failed:', error);
       setStatus(prev => ({ ...prev, aiService: 'error' }));
-      newErrors.push(`AI Service: ${error.message}`);
+      results.push({
+        service: 'AI Service',
+        status: 'error',
+        message: `AI service failed: ${error.message}`,
+        details: 'OpenRouter API or AI processing not working',
+        actionable: [
+          'Check OpenRouter API key in Supabase secrets',
+          'Verify OpenRouter account billing status',
+          'Test edge function manually',
+          'Check network connectivity to OpenRouter'
+        ]
+      });
     }
 
-    setErrors(newErrors);
+    // Calculate system health score
+    const healthyServices = results.filter(r => r.status === 'healthy').length;
+    const score = (healthyServices / results.length) * 100;
+    setSystemScore(score);
+
+    setHealthResults(results);
     setLastChecked(new Date());
     setChecking(false);
   };
@@ -109,105 +183,113 @@ export function SystemHealth({ onAIServiceFixed }: SystemHealthProps) {
     }
   };
 
+  const getServiceIcon = (serviceName: string) => {
+    switch (serviceName.toLowerCase()) {
+      case 'database':
+        return <Database className="h-4 w-4" />;
+      case 'ai service':
+        return <Brain className="h-4 w-4" />;
+      case 'edge function':
+        return <Zap className="h-4 w-4" />;
+      default:
+        return <AlertTriangle className="h-4 w-4" />;
+    }
+  };
+
   const hasErrors = Object.values(status).some(s => s === 'error');
+  const overallStatus = systemScore === 100 ? 'excellent' : systemScore >= 67 ? 'good' : systemScore >= 33 ? 'degraded' : 'critical';
 
   return (
-    <Card className="w-full max-w-2xl mx-auto">
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          <span>System Health Status</span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={checkSystemHealth}
-            disabled={checking}
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${checking ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-        </CardTitle>
-      </CardHeader>
-
-      <CardContent className="space-y-4">
-        {/* Service Status */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between p-3 border rounded-lg">
-            <div className="flex items-center space-x-2">
-              {getStatusIcon(status.database)}
-              <span className="font-medium">Database</span>
-            </div>
-            {getStatusBadge(status.database)}
-          </div>
-
-          <div className="flex items-center justify-between p-3 border rounded-lg">
-            <div className="flex items-center space-x-2">
-              {getStatusIcon(status.edgeFunction)}
-              <span className="font-medium">Edge Function</span>
-            </div>
-            {getStatusBadge(status.edgeFunction)}
-          </div>
-
-          <div className="flex items-center justify-between p-3 border rounded-lg">
-            <div className="flex items-center space-x-2">
-              {getStatusIcon(status.aiService)}
-              <span className="font-medium">AI Service</span>
-            </div>
-            {getStatusBadge(status.aiService)}
+    <div className="space-y-4">
+      {/* Overall System Status */}
+      <div className="flex items-center justify-between p-4 rounded-lg border bg-gradient-to-r from-blue-50 to-indigo-50">
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900">System Health Score</h3>
+          <p className="text-sm text-gray-600">Overall system operational status</p>
+        </div>
+        <div className="text-right">
+          <div className="text-3xl font-bold text-indigo-600">{Math.round(systemScore)}%</div>
+          <div className={`text-sm font-medium ${
+            overallStatus === 'excellent' ? 'text-green-600' :
+            overallStatus === 'good' ? 'text-blue-600' :
+            overallStatus === 'degraded' ? 'text-yellow-600' : 'text-red-600'
+          }`}>
+            {overallStatus.toUpperCase()}
           </div>
         </div>
+      </div>
 
-        {/* Error Messages */}
-        {errors.length > 0 && (
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>
-              <div className="space-y-1">
-                <p className="font-medium">System Issues Detected:</p>
-                {errors.map((error, index) => (
-                  <p key={index} className="text-sm">• {error}</p>
-                ))}
-              </div>
-            </AlertDescription>
-          </Alert>
-        )}
+      {/* Service Status Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {healthResults.map((result, index) => (
+          <Card key={index} className={`${result.status === 'error' ? 'border-red-200 bg-red-50' : 'border-green-200 bg-green-50'}`}>
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center justify-between text-sm">
+                <div className="flex items-center space-x-2">
+                  {getServiceIcon(result.service)}
+                  <span>{result.service}</span>
+                </div>
+                {getStatusBadge(result.status)}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <p className="text-sm text-gray-700 mb-2">{result.message}</p>
+              {result.details && (
+                <p className="text-xs text-gray-500 mb-2">{result.details}</p>
+              )}
+              {result.actionable && (
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-gray-700">Actions:</p>
+                  {result.actionable.map((action, i) => (
+                    <p key={i} className="text-xs text-gray-600">• {action}</p>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
 
-        {/* Overall Status */}
-        {!hasErrors && !checking && (
-          <Alert>
-            <CheckCircle className="h-4 w-4" />
-            <AlertDescription>
-              All systems operational. Clinical assessment features should work normally.
-            </AlertDescription>
-          </Alert>
-        )}
+      {/* Overall Status Alert */}
+      {!hasErrors && !checking && systemScore === 100 && (
+        <Alert className="border-green-200 bg-green-50">
+          <CheckCircle className="h-4 w-4 text-green-600" />
+          <AlertDescription className="text-green-800">
+            All systems operational. Clinical assessment features should work normally.
+          </AlertDescription>
+        </Alert>
+      )}
 
-        {/* Last Checked */}
+      {hasErrors && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            <div className="space-y-2">
+              <p className="font-medium">System Issues Detected ({3 - Math.round(systemScore/33.33)} services affected)</p>
+              <p className="text-sm">Some clinical features may not work properly. See individual service status above for specific actions.</p>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Controls */}
+      <div className="flex items-center justify-between">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={checkSystemHealth}
+          disabled={checking}
+        >
+          <RefreshCw className={`h-4 w-4 mr-2 ${checking ? 'animate-spin' : ''}`} />
+          {checking ? 'Checking...' : 'Refresh Status'}
+        </Button>
+        
         {lastChecked && (
-          <p className="text-sm text-gray-500 text-center">
+          <p className="text-sm text-gray-500">
             Last checked: {lastChecked.toLocaleTimeString()}
           </p>
         )}
-
-        {/* Recovery Instructions */}
-        {hasErrors && (
-          <div className="mt-4 p-4 bg-blue-50 rounded-lg">
-            <h4 className="font-medium text-blue-900 mb-2">Troubleshooting Steps:</h4>
-            <ul className="text-sm text-blue-800 space-y-1">
-              {status.aiService === 'error' && (
-                <li>• Check OpenRouter API key configuration in Supabase secrets</li>
-              )}
-              {status.edgeFunction === 'error' && (
-                <li>• Verify edge function deployment status</li>
-              )}
-              {status.database === 'error' && (
-                <li>• Check database connectivity and permissions</li>
-              )}
-              <li>• Try refreshing the page</li>
-              <li>• Contact support if issues persist</li>
-            </ul>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

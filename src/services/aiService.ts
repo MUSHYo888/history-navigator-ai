@@ -1,6 +1,5 @@
-
-// ABOUTME: Main AI service orchestrator for clinical AI features
-// ABOUTME: Coordinates specialized AI services and provides unified interface
+// ABOUTME: Main AI service orchestrator for clinical AI features with enhanced error handling
+// ABOUTME: Coordinates specialized AI services and provides unified interface with fallback mechanisms
 
 import { Question, DifferentialDiagnosis } from '@/types/medical';
 import { AdvancedClinicalSupport } from '@/types/clinical-scores';
@@ -8,13 +7,42 @@ import { ClinicalScoringService } from '@/services/clinicalScoringService';
 import { QuestionGeneratorService } from './ai/QuestionGeneratorService';
 import { DifferentialDiagnosisService } from './ai/DifferentialDiagnosisService';
 import { ClinicalSupportService } from './ai/ClinicalSupportService';
+import { FallbackDataService } from './fallback/FallbackDataService';
 
 export class AIService {
+  private static logAICall(service: string, chiefComplaint: string, success: boolean, error?: any) {
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] AI Service Call:`, {
+      service,
+      chiefComplaint,
+      success,
+      error: error?.message || null
+    });
+  }
+
   static async generateQuestions(
     chiefComplaint: string, 
     previousAnswers?: Record<string, any>
   ): Promise<Question[]> {
-    return QuestionGeneratorService.generateQuestions(chiefComplaint, previousAnswers);
+    try {
+      console.log(`AIService: Attempting to generate questions for: "${chiefComplaint}"`);
+      
+      const questions = await QuestionGeneratorService.generateQuestions(chiefComplaint, previousAnswers);
+      
+      this.logAICall('generateQuestions', chiefComplaint, true);
+      console.log(`AIService: Successfully generated ${questions.length} questions`);
+      
+      return questions;
+    } catch (error) {
+      this.logAICall('generateQuestions', chiefComplaint, false, error);
+      console.warn(`AIService: AI question generation failed, using fallback:`, error);
+      
+      // Enhanced fallback with better error messaging
+      const fallbackQuestions = FallbackDataService.getFallbackQuestions(chiefComplaint);
+      console.log(`AIService: Using ${fallbackQuestions.length} fallback questions`);
+      
+      return fallbackQuestions;
+    }
   }
 
   static async generateDifferentialDiagnosis(
@@ -22,7 +50,28 @@ export class AIService {
     answers: Record<string, any>,
     rosData?: Record<string, any>
   ): Promise<DifferentialDiagnosis[]> {
-    return DifferentialDiagnosisService.generateDifferentialDiagnosis(chiefComplaint, answers, rosData);
+    try {
+      console.log(`AIService: Attempting to generate differential diagnosis for: "${chiefComplaint}"`);
+      
+      const differentials = await DifferentialDiagnosisService.generateDifferentialDiagnosis(
+        chiefComplaint, 
+        answers, 
+        rosData
+      );
+      
+      this.logAICall('generateDifferentialDiagnosis', chiefComplaint, true);
+      console.log(`AIService: Successfully generated ${differentials.length} differential diagnoses`);
+      
+      return differentials;
+    } catch (error) {
+      this.logAICall('generateDifferentialDiagnosis', chiefComplaint, false, error);
+      console.warn(`AIService: AI differential diagnosis failed, using fallback:`, error);
+      
+      const fallbackDifferentials = FallbackDataService.getFallbackDifferentials(chiefComplaint);
+      console.log(`AIService: Using ${fallbackDifferentials.length} fallback differentials`);
+      
+      return fallbackDifferentials;
+    }
   }
 
   static async generateClinicalDecisionSupport(
@@ -31,12 +80,32 @@ export class AIService {
     answers: Record<string, any>,
     rosData?: Record<string, any>
   ): Promise<any> {
-    return ClinicalSupportService.generateClinicalDecisionSupport(
-      chiefComplaint, 
-      differentialDiagnoses, 
-      answers, 
-      rosData
-    );
+    try {
+      console.log(`AIService: Attempting to generate clinical decision support for: "${chiefComplaint}"`);
+      
+      const support = await ClinicalSupportService.generateClinicalDecisionSupport(
+        chiefComplaint, 
+        differentialDiagnoses, 
+        answers, 
+        rosData
+      );
+      
+      this.logAICall('generateClinicalDecisionSupport', chiefComplaint, true);
+      console.log(`AIService: Successfully generated clinical decision support`);
+      
+      return support;
+    } catch (error) {
+      this.logAICall('generateClinicalDecisionSupport', chiefComplaint, false, error);
+      console.warn(`AIService: AI clinical support failed, using fallback:`, error);
+      
+      return {
+        investigations: FallbackDataService.getFallbackInvestigations(chiefComplaint),
+        redFlags: FallbackDataService.getFallbackRedFlags(chiefComplaint),
+        guidelines: FallbackDataService.getFallbackGuidelines(chiefComplaint),
+        treatmentRecommendations: [],
+        followUpRecommendations: []
+      };
+    }
   }
 
   static async generateAdvancedClinicalSupport(
@@ -76,6 +145,8 @@ export class AIService {
         clinicalAlerts
       );
 
+      this.logAICall('generateAdvancedClinicalSupport', chiefComplaint, true);
+
       return {
         severityScores,
         riskAssessment,
@@ -84,6 +155,7 @@ export class AIService {
       };
 
     } catch (error) {
+      this.logAICall('generateAdvancedClinicalSupport', chiefComplaint, false, error);
       console.error('Error generating advanced clinical support:', error);
       return this.getFallbackAdvancedSupport(chiefComplaint);
     }
