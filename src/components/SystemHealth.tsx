@@ -1,13 +1,13 @@
 
-// ABOUTME: System health monitoring component for debugging and user feedback with enhanced error recovery
-// ABOUTME: Shows AI service status, database connectivity, and error reporting with actionable solutions
+// ABOUTME: System health monitoring component with comprehensive AI service diagnostics
+// ABOUTME: Enhanced monitoring for OpenRouter API, edge functions, and clinical workflows
 
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, CheckCircle, XCircle, AlertTriangle, RefreshCw, Database, Brain, Zap } from 'lucide-react';
+import { Loader2, CheckCircle, XCircle, AlertTriangle, RefreshCw, Database, Brain, Zap, Activity } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { AIService } from '@/services/aiService';
 
@@ -15,6 +15,7 @@ interface SystemStatus {
   database: 'healthy' | 'error' | 'checking';
   aiService: 'healthy' | 'error' | 'checking';
   edgeFunction: 'healthy' | 'error' | 'checking';
+  openRouterAPI: 'healthy' | 'error' | 'checking';
 }
 
 interface HealthCheckResult {
@@ -23,6 +24,7 @@ interface HealthCheckResult {
   message: string;
   details?: string;
   actionable?: string[];
+  responseTime?: number;
 }
 
 interface SystemHealthProps {
@@ -33,7 +35,8 @@ export function SystemHealth({ onAIServiceFixed }: SystemHealthProps) {
   const [status, setStatus] = useState<SystemStatus>({
     database: 'checking',
     aiService: 'checking',
-    edgeFunction: 'checking'
+    edgeFunction: 'checking',
+    openRouterAPI: 'checking'
   });
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
   const [checking, setChecking] = useState(false);
@@ -48,18 +51,21 @@ export function SystemHealth({ onAIServiceFixed }: SystemHealthProps) {
     // Check database connectivity
     try {
       console.log('SystemHealth: Checking database connectivity...');
+      const startTime = Date.now();
       const { error, count } = await supabase
         .from('patients')
         .select('count', { count: 'exact', head: true });
       
       if (error) throw error;
       
+      const responseTime = Date.now() - startTime;
       setStatus(prev => ({ ...prev, database: 'healthy' }));
       results.push({
         service: 'Database',
         status: 'healthy',
         message: `Connected successfully. ${count || 0} patients in database.`,
-        details: 'Supabase database connection is operational'
+        details: 'Supabase database connection is operational',
+        responseTime
       });
     } catch (error) {
       console.error('Database check failed:', error);
@@ -80,19 +86,46 @@ export function SystemHealth({ onAIServiceFixed }: SystemHealthProps) {
     // Check edge function
     try {
       console.log('SystemHealth: Checking edge function...');
+      const startTime = Date.now();
       const { data, error } = await supabase.functions.invoke('ai-assistant', {
         body: { action: 'test' }
       });
       
       if (error) throw error;
       
+      const responseTime = Date.now() - startTime;
       setStatus(prev => ({ ...prev, edgeFunction: 'healthy' }));
       results.push({
         service: 'Edge Function',
         status: 'healthy',
         message: 'AI Assistant function is operational',
-        details: `Response: ${data?.message || 'Function responding normally'}`
+        details: `Response: ${data?.message || 'Function responding normally'}`,
+        responseTime
       });
+
+      // If edge function works, test OpenRouter integration
+      if (data?.openRouterConfigured) {
+        setStatus(prev => ({ ...prev, openRouterAPI: 'healthy' }));
+        results.push({
+          service: 'OpenRouter API',
+          status: 'healthy',
+          message: 'OpenRouter API key is configured',
+          details: 'API key is available in edge function environment'
+        });
+      } else {
+        setStatus(prev => ({ ...prev, openRouterAPI: 'error' }));
+        results.push({
+          service: 'OpenRouter API',
+          status: 'error',
+          message: 'OpenRouter API key not configured',
+          details: 'API key missing from edge function secrets',
+          actionable: [
+            'Check OPENROUTER_API_KEY in Supabase secrets',
+            'Verify API key is valid and has credits',
+            'Test API key directly with OpenRouter'
+          ]
+        });
+      }
     } catch (error) {
       console.error('Edge function check failed:', error);
       setStatus(prev => ({ ...prev, edgeFunction: 'error' }));
@@ -107,22 +140,43 @@ export function SystemHealth({ onAIServiceFixed }: SystemHealthProps) {
           'Check function logs in Supabase dashboard'
         ]
       });
+
+      // Mark OpenRouter as unknown if edge function fails
+      setStatus(prev => ({ ...prev, openRouterAPI: 'error' }));
+      results.push({
+        service: 'OpenRouter API',
+        status: 'error',
+        message: 'Cannot test - edge function not responding',
+        details: 'OpenRouter API test requires working edge function'
+      });
     }
 
-    // Check AI service with real test
+    // Test AI service with actual question generation
     try {
-      console.log('SystemHealth: Checking AI service with test question generation...');
-      const testQuestions = await AIService.generateQuestions('test headache for system check');
+      console.log('SystemHealth: Testing AI service with real question generation...');
+      const startTime = Date.now();
+      const testQuestions = await AIService.generateQuestions('test headache for system health check');
+      const responseTime = Date.now() - startTime;
       
       if (testQuestions && testQuestions.length > 0) {
-        setStatus(prev => ({ ...prev, aiService: 'healthy' }));
-        results.push({
-          service: 'AI Service',
-          status: 'healthy',
-          message: `AI service operational. Generated ${testQuestions.length} test questions.`,
-          details: 'OpenRouter API and question generation working correctly'
-        });
-        onAIServiceFixed?.();
+        // Validate question structure
+        const validQuestions = testQuestions.filter(q => 
+          q.id && q.text && q.type && q.category
+        );
+        
+        if (validQuestions.length === testQuestions.length) {
+          setStatus(prev => ({ ...prev, aiService: 'healthy' }));
+          results.push({
+            service: 'AI Service',
+            status: 'healthy',
+            message: `AI service operational. Generated ${testQuestions.length} valid questions.`,
+            details: 'OpenRouter API and question generation working correctly',
+            responseTime
+          });
+          onAIServiceFixed?.();
+        } else {
+          throw new Error(`Generated ${testQuestions.length} questions but only ${validQuestions.length} are valid`);
+        }
       } else {
         throw new Error('No questions generated from AI service');
       }
@@ -133,12 +187,13 @@ export function SystemHealth({ onAIServiceFixed }: SystemHealthProps) {
         service: 'AI Service',
         status: 'error',
         message: `AI service failed: ${error.message}`,
-        details: 'OpenRouter API or AI processing not working',
+        details: 'OpenRouter API or AI processing not working properly',
         actionable: [
-          'Check OpenRouter API key in Supabase secrets',
-          'Verify OpenRouter account billing status',
-          'Test edge function manually',
-          'Check network connectivity to OpenRouter'
+          'Check OpenRouter API key validity',
+          'Verify OpenRouter account has sufficient credits',
+          'Test edge function logs for detailed errors',
+          'Check network connectivity to OpenRouter',
+          'Verify model availability (claude-3.5-sonnet)'
         ]
       });
     }
@@ -191,13 +246,17 @@ export function SystemHealth({ onAIServiceFixed }: SystemHealthProps) {
         return <Brain className="h-4 w-4" />;
       case 'edge function':
         return <Zap className="h-4 w-4" />;
+      case 'openrouter api':
+        return <Activity className="h-4 w-4" />;
       default:
         return <AlertTriangle className="h-4 w-4" />;
     }
   };
 
   const hasErrors = Object.values(status).some(s => s === 'error');
-  const overallStatus = systemScore === 100 ? 'excellent' : systemScore >= 67 ? 'good' : systemScore >= 33 ? 'degraded' : 'critical';
+  const overallStatus = systemScore === 100 ? 'excellent' : 
+                       systemScore >= 75 ? 'good' : 
+                       systemScore >= 50 ? 'degraded' : 'critical';
 
   return (
     <div className="space-y-4">
@@ -220,7 +279,7 @@ export function SystemHealth({ onAIServiceFixed }: SystemHealthProps) {
       </div>
 
       {/* Service Status Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {healthResults.map((result, index) => (
           <Card key={index} className={`${result.status === 'error' ? 'border-red-200 bg-red-50' : 'border-green-200 bg-green-50'}`}>
             <CardHeader className="pb-2">
@@ -229,7 +288,12 @@ export function SystemHealth({ onAIServiceFixed }: SystemHealthProps) {
                   {getServiceIcon(result.service)}
                   <span>{result.service}</span>
                 </div>
-                {getStatusBadge(result.status)}
+                <div className="flex items-center space-x-2">
+                  {result.responseTime && (
+                    <span className="text-xs text-gray-500">{result.responseTime}ms</span>
+                  )}
+                  {getStatusBadge(result.status)}
+                </div>
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
@@ -239,7 +303,7 @@ export function SystemHealth({ onAIServiceFixed }: SystemHealthProps) {
               )}
               {result.actionable && (
                 <div className="space-y-1">
-                  <p className="text-xs font-medium text-gray-700">Actions:</p>
+                  <p className="text-xs font-medium text-gray-700">Actions needed:</p>
                   {result.actionable.map((action, i) => (
                     <p key={i} className="text-xs text-gray-600">• {action}</p>
                   ))}
@@ -250,7 +314,7 @@ export function SystemHealth({ onAIServiceFixed }: SystemHealthProps) {
         ))}
       </div>
 
-      {/* Overall Status Alert */}
+      {/* Status Alerts */}
       {!hasErrors && !checking && systemScore === 100 && (
         <Alert className="border-green-200 bg-green-50">
           <CheckCircle className="h-4 w-4 text-green-600" />
@@ -265,8 +329,11 @@ export function SystemHealth({ onAIServiceFixed }: SystemHealthProps) {
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
             <div className="space-y-2">
-              <p className="font-medium">System Issues Detected ({3 - Math.round(systemScore/33.33)} services affected)</p>
+              <p className="font-medium">System Issues Detected</p>
               <p className="text-sm">Some clinical features may not work properly. See individual service status above for specific actions.</p>
+              {systemScore < 50 && (
+                <p className="text-sm font-medium">Critical system issues detected. Medical assessments may fail.</p>
+              )}
             </div>
           </AlertDescription>
         </Alert>
@@ -290,6 +357,25 @@ export function SystemHealth({ onAIServiceFixed }: SystemHealthProps) {
           </p>
         )}
       </div>
+
+      {/* Performance Metrics */}
+      {healthResults.some(r => r.responseTime) && (
+        <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+          <h4 className="text-sm font-medium text-gray-700 mb-2">Response Times</h4>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            {healthResults
+              .filter(r => r.responseTime)
+              .map((result, index) => (
+                <div key={index} className="flex justify-between">
+                  <span>{result.service}:</span>
+                  <span className={`font-mono ${result.responseTime! > 5000 ? 'text-red-600' : result.responseTime! > 2000 ? 'text-yellow-600' : 'text-green-600'}`}>
+                    {result.responseTime}ms
+                  </span>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
