@@ -155,12 +155,21 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
       return;
     }
 
-    // Validate answer format
-    if (!answer || typeof answer.value === 'undefined') {
+    // Validate answer format - be more lenient with validation
+    if (!answer || (typeof answer.value === 'undefined' && typeof answer.value !== 'number' && typeof answer.value !== 'boolean')) {
       console.error('Invalid answer format:', answer);
       toast.error('Invalid answer format. Please provide a valid answer.');
       return;
     }
+
+    // Log detailed answer submission info for debugging
+    console.log('Answer submission details:', {
+      questionId,
+      answerValue: answer.value,
+      answerType: typeof answer.value,
+      notes: answer.notes,
+      assessmentId: state.currentAssessment.id
+    });
 
     try {
       // Update local state first

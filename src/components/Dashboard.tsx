@@ -9,9 +9,10 @@ import { SystemHealth } from './SystemHealth';
 interface DashboardProps {
   onNewPatient: () => void;
   onViewPatients: () => void;
+  onTestAI?: () => void;
 }
 
-export function Dashboard({ onNewPatient, onViewPatients }: DashboardProps) {
+export function Dashboard({ onNewPatient, onViewPatients, onTestAI }: DashboardProps) {
   const { state } = useMedical();
   const [showSystemHealth, setShowSystemHealth] = useState(false);
   
@@ -95,14 +96,25 @@ export function Dashboard({ onNewPatient, onViewPatients }: DashboardProps) {
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <span>System Status</span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowSystemHealth(!showSystemHealth)}
-            >
-              <Settings className="h-4 w-4 mr-2" />
-              {showSystemHealth ? 'Hide' : 'Show'} Details
-            </Button>
+            <div className="flex gap-2">
+              {onTestAI && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onTestAI}
+                >
+                  🔧 Test AI Services
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowSystemHealth(!showSystemHealth)}
+              >
+                <Settings className="h-4 w-4 mr-2" />
+                {showSystemHealth ? 'Hide' : 'Show'} Details
+              </Button>
+            </div>
           </CardTitle>
         </CardHeader>
         <CardContent>

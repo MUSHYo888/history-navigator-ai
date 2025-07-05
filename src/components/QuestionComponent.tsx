@@ -27,7 +27,14 @@ export function QuestionComponent({ question, onSubmit, questionNumber, totalQue
       finalAnswer = scaleValue[0];
     }
     
-    if (!finalAnswer && question.required) return;
+    // More lenient validation - allow empty answers for non-required questions
+    // Fix: Handle falsy values properly (0, false, etc should be valid)
+    if (question.required && (finalAnswer === '' || finalAnswer === null || finalAnswer === undefined)) {
+      console.warn('Required question not answered:', question.id, finalAnswer);
+      return;
+    }
+
+    console.log('Submitting answer:', { questionId: question.id, finalAnswer, notes: notes.trim() });
 
     onSubmit(question.id, {
       value: finalAnswer,
@@ -41,14 +48,16 @@ export function QuestionComponent({ question, onSubmit, questionNumber, totalQue
   };
 
   const canSubmit = () => {
+    // Always allow non-required questions
     if (!question.required) return true;
     
-    if (question.type === 'scale') return true;
-    if (question.type === 'yes-no') return answer !== '';
-    if (question.type === 'multiple-choice') return answer !== '';
+    // For required questions, check based on type
+    if (question.type === 'scale') return true; // Scale always has a value
+    if (question.type === 'yes-no') return answer !== '' && answer !== null && answer !== undefined;
+    if (question.type === 'multiple-choice') return answer !== '' && answer !== null && answer !== undefined;
     if (question.type === 'text') return answer.toString().trim() !== '';
     
-    return false;
+    return true; // Default to allowing submission
   };
 
   return (
@@ -140,7 +149,10 @@ export function QuestionComponent({ question, onSubmit, questionNumber, totalQue
         </div>
       </div>
 
-      <div className="flex justify-end">
+      <div className="flex justify-between items-center">
+        <div className="text-sm text-gray-500">
+          {question.required ? 'Required field' : 'Optional - click Next to skip'}
+        </div>
         <Button 
           onClick={handleSubmit}
           disabled={!canSubmit()}

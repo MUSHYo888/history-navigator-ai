@@ -3,14 +3,16 @@
 // ABOUTME: Orchestrates patient creation, assessment workflow, and data persistence with comprehensive error handling
 
 import React, { useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { Header } from '@/components/Header';
-import { Dashboard } from '@/components/Dashboard';
-import { NewPatientForm } from '@/components/NewPatientForm';
-import { ChiefComplaintSelector } from '@/components/ChiefComplaintSelector';
-import { AssessmentWorkflow } from '@/components/AssessmentWorkflow';
-import { PatientList } from '@/components/PatientList';
-import { AssessmentResume } from '@/components/AssessmentResume';
-import { AssessmentErrorRecovery } from '@/components/AssessmentErrorRecovery';
+    import { Dashboard } from '@/components/Dashboard';
+    import { NewPatientForm } from '@/components/NewPatientForm';
+    import { ChiefComplaintSelector } from '@/components/ChiefComplaintSelector';
+    import { AssessmentWorkflow } from '@/components/AssessmentWorkflow';
+    import { PatientList } from '@/components/PatientList';
+    import { AssessmentResume } from '@/components/AssessmentResume';
+    import { AssessmentErrorRecovery } from '@/components/AssessmentErrorRecovery';
+    import { AIServiceTest } from '@/components/AIServiceTest';
 import { Patient, Assessment } from '@/types/medical';
 import { useMedical } from '@/context/MedicalContext';
 import { useCreateAssessment, useUpdateAssessmentStep, useAssessment } from '@/hooks/useAssessment';
@@ -18,7 +20,7 @@ import { useUpdatePatientAssessment } from '@/hooks/usePatients';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-type AppState = 'dashboard' | 'new-patient' | 'chief-complaint' | 'assessment' | 'patients' | 'summary' | 'resume-assessment' | 'error-recovery';
+type AppState = 'dashboard' | 'new-patient' | 'chief-complaint' | 'assessment' | 'patients' | 'summary' | 'resume-assessment' | 'error-recovery' | 'ai-testing';
 
 const Index = () => {
   const { state, dispatch } = useMedical();
@@ -201,6 +203,7 @@ const Index = () => {
           <Dashboard 
             onNewPatient={handleNewPatient}
             onViewPatients={() => setCurrentView('patients')}
+            onTestAI={() => setCurrentView('ai-testing')}
           />
         )}
 
@@ -242,6 +245,20 @@ const Index = () => {
             onResumeAssessment={handleResumeAssessment}
             onNewAssessment={handleNewPatient}
           />
+        )}
+
+        {currentView === 'ai-testing' && (
+          <div className="p-6">
+            <div className="mb-4">
+              <Button
+                variant="outline"
+                onClick={() => setCurrentView('dashboard')}
+              >
+                ← Back to Dashboard
+              </Button>
+            </div>
+            <AIServiceTest />
+          </div>
         )}
 
         {currentView === 'summary' && (

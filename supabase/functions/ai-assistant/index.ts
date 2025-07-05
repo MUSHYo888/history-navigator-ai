@@ -72,6 +72,28 @@ serve(async (req) => {
 
     console.log(`Processing action: ${action} for chief complaint: "${chiefComplaint}"`);
 
+    // Handle health check
+    if (requestBody.action === 'health-check') {
+      const healthData = {
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        service: 'ai-assistant',
+        version: '1.0.0',
+        environment: {
+          hasOpenRouterKey: !!openRouterApiKey,
+          openRouterKeyLength: openRouterApiKey ? openRouterApiKey.length : 0,
+          denoVersion: Deno.version.deno
+        }
+      };
+      
+      console.log('Health check response:', healthData);
+      
+      return new Response(JSON.stringify(healthData), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      });
+    }
+
     if (action === 'generate-questions') {
       const { previousAnswers = {} }: GenerateQuestionsRequest = requestBody;
       
