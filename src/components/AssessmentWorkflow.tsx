@@ -210,14 +210,14 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
   };
 
   const handleROSComplete = async () => {
-    addDebugInfo('ROS completed, moving to PMH');
+    console.log('ROS completed, moving to PMH');
     setShowROS(false);
     setShowPMH(true);
     await updateStep(3);
   };
 
   const handlePMHComplete = async (pmhData: any) => {
-    addDebugInfo('PMH completed, saving data');
+    console.log('PMH completed, saving data');
     dispatch({
       type: 'SET_PMH_DATA',
       payload: pmhData
@@ -229,7 +229,7 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
   };
 
   const handlePEComplete = async (peData: any) => {
-    addDebugInfo('PE completed, saving data');
+    console.log('PE completed, saving data');
     dispatch({
       type: 'SET_PE_DATA',
       payload: peData
@@ -241,7 +241,7 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
   };
 
   const handleSummaryComplete = () => {
-    addDebugInfo('Assessment workflow completed');
+    console.log('Assessment workflow completed');
     onComplete();
   };
 
