@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Plus, Users, Clock, FileText, Activity, Settings } from 'lucide-react';
+import { Plus, Users, Clock, FileText, Activity, Settings, Wrench } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useMedical } from '@/context/MedicalContext';
@@ -31,10 +31,22 @@ export function Dashboard({ onNewPatient, onViewPatients, onTestAI }: DashboardP
           <p className="text-gray-600">Manage patient assessments and clinical workflows</p>
         </div>
         
-        <Button onClick={onNewPatient} className="bg-teal-600 hover:bg-teal-700">
-          <Plus className="h-4 w-4 mr-2" />
-          New Patient Assessment
-        </Button>
+        <div className="flex gap-2">
+          {onTestAI && (
+            <Button
+              variant="outline"
+              onClick={onTestAI}
+              className="bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100"
+            >
+              <Wrench className="h-4 w-4 mr-2" />
+              AI Diagnostics
+            </Button>
+          )}
+          <Button onClick={onNewPatient} className="bg-teal-600 hover:bg-teal-700">
+            <Plus className="h-4 w-4 mr-2" />
+            New Patient Assessment
+          </Button>
+        </div>
       </div>
 
       {/* Stats Grid */}
@@ -102,8 +114,10 @@ export function Dashboard({ onNewPatient, onViewPatients, onTestAI }: DashboardP
                   variant="outline"
                   size="sm"
                   onClick={onTestAI}
+                  className="text-orange-600 border-orange-200 hover:bg-orange-50"
                 >
-                  🔧 Test AI Services
+                  <Wrench className="h-4 w-4 mr-2" />
+                  Run AI Diagnostics
                 </Button>
               )}
               <Button
@@ -121,9 +135,14 @@ export function Dashboard({ onNewPatient, onViewPatients, onTestAI }: DashboardP
           {showSystemHealth ? (
             <SystemHealth />
           ) : (
-            <p className="text-gray-600">
-              Click "Show Details" to check system health and troubleshoot issues.
-            </p>
+            <div className="text-center py-4">
+              <p className="text-gray-600 mb-3">
+                Click "Show Details" to check system health and troubleshoot issues.
+              </p>
+              <p className="text-sm text-orange-600">
+                If you're experiencing AI service errors, use the "Run AI Diagnostics" button for detailed testing.
+              </p>
+            </div>
           )}
         </CardContent>
       </Card>
