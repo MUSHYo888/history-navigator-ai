@@ -50,20 +50,20 @@ serve(async (req) => {
     console.log('Method:', req.method);
     console.log('URL:', req.url);
 
-    // Check OpenAI API Key
-    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+    // Check Google API Key
+    const googleApiKey = Deno.env.get('GOOGLE_API');
     console.log('Environment check:', {
-      hasOpenAIKey: !!openAIApiKey,
-      keyLength: openAIApiKey ? openAIApiKey.length : 0,
-      keyPreview: openAIApiKey ? openAIApiKey.substring(0, 12) + '...' : 'NOT_SET'
+      hasGoogleKey: !!googleApiKey,
+      keyLength: googleApiKey ? googleApiKey.length : 0,
+      keyPreview: googleApiKey ? googleApiKey.substring(0, 12) + '...' : 'NOT_SET'
     });
 
-    if (!openAIApiKey) {
+    if (!googleApiKey) {
       const errorResponse = { 
-        error: 'OPENAI_API_KEY is not configured in Supabase secrets',
+        error: 'GOOGLE_API is not configured in Supabase secrets',
         timestamp: new Date().toISOString(),
         function: 'ai-assistant',
-        details: 'Please configure the OPENAI_API_KEY in your Supabase project settings under Edge Functions > Secrets'
+        details: 'Please configure the GOOGLE_API in your Supabase project settings under Edge Functions > Secrets'
       };
       console.error('API Key Error:', errorResponse);
       return new Response(JSON.stringify(errorResponse), {
@@ -117,11 +117,11 @@ serve(async (req) => {
         service: 'ai-assistant',
         version: '2.0.0',
         environment: {
-          hasOpenAIKey: !!openAIApiKey,
-          openAIKeyLength: openAIApiKey ? openAIApiKey.length : 0,
+          hasGoogleKey: !!googleApiKey,
+          googleKeyLength: googleApiKey ? googleApiKey.length : 0,
           denoVersion: Deno.version.deno,
-          keyStatus: openAIApiKey ? 'CONFIGURED' : 'MISSING',
-          keyPrefix: openAIApiKey ? openAIApiKey.substring(0, 8) + '...' : 'N/A'
+          keyStatus: googleApiKey ? 'CONFIGURED' : 'MISSING',
+          keyPrefix: googleApiKey ? googleApiKey.substring(0, 8) + '...' : 'N/A'
         },
         endpoints: {
           'generate-questions': 'available',
@@ -147,7 +147,7 @@ serve(async (req) => {
         status: 'healthy', 
         timestamp: new Date().toISOString(),
         message: 'AI Assistant function is operational',
-        openAIConfigured: !!openAIApiKey,
+        googleConfigured: !!googleApiKey,
         version: '2.0.0',
         testResult: 'PASS'
       };
@@ -204,64 +204,65 @@ ${Object.keys(previousAnswers).length > 0 ? `Previous answers: ${JSON.stringify(
 
 Generate focused clinical questions for this presentation.`;
 
-      console.log(`Sending request to OpenAI API...`);
+      console.log(`Sending request to Google Gemini API...`);
       console.log(`System prompt length: ${systemPrompt.length} characters`);
       console.log(`User prompt length: ${userPrompt.length} characters`);
 
       try {
-        const modelToUse = 'gpt-4o-mini';
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        const modelToUse = 'gemini-2.0-flash-exp';
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?key=${googleApiKey}`, {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${openAIApiKey}`,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            model: modelToUse,
-            messages: [
-              { role: 'system', content: systemPrompt },
-              { role: 'user', content: userPrompt }
-            ],
-            temperature: 0.3,
-            max_tokens: 2000
+            contents: [{
+              parts: [{
+                text: `${systemPrompt}\n\n${userPrompt}`
+              }]
+            }],
+            generationConfig: {
+              maxOutputTokens: 2000,
+              temperature: 0.3
+            }
           }),
         });
 
-        console.log(`OpenAI response status: ${response.status}`);
-        console.log(`OpenAI response headers:`, Object.fromEntries(response.headers.entries()));
+        console.log(`Gemini response status: ${response.status}`);
+        console.log(`Gemini response headers:`, Object.fromEntries(response.headers.entries()));
 
         if (!response.ok) {
           const errorText = await response.text();
-          console.error('OpenAI API Error Details:', {
+          console.error('Gemini API Error Details:', {
             status: response.status,
             statusText: response.statusText,
             headers: Object.fromEntries(response.headers.entries()),
             body: errorText
           });
           
-          logError('OPENAI_API', { status: response.status, statusText: response.statusText }, { 
+          logError('GEMINI_API', { status: response.status, statusText: response.statusText }, { 
             errorText,
             model: modelToUse,
-            hasApiKey: !!openAIApiKey,
-            keyLength: openAIApiKey?.length
+            hasApiKey: !!googleApiKey,
+            keyLength: googleApiKey?.length
           });
           
           const errorResponse = {
-            error: `OpenAI API error: ${response.status} - ${response.statusText}`,
+            error: `Gemini API error: ${response.status} - ${response.statusText}`,
             details: errorText,
             timestamp: new Date().toISOString(),
-            apiKeyConfigured: !!openAIApiKey,
+            apiKeyConfigured: !!googleApiKey,
             modelUsed: modelToUse,
             troubleshooting: {
               possibleCauses: [
                 'API key invalid or expired',
-                'Insufficient credits on OpenAI account',
+                'Gemini API quota exceeded',
                 'Model not available or rate limited',
                 'Request payload too large'
               ],
               nextSteps: [
-                'Verify API key in OpenAI dashboard',
-                'Check account credits and billing',
+                'Verify API key in Google AI Studio',
+                'Check API quota and billing',
                 'Try again in a few minutes if rate limited'
               ]
             }
@@ -274,13 +275,13 @@ Generate focused clinical questions for this presentation.`;
         }
 
         const data = await response.json();
-        console.log('OpenAI response data:', JSON.stringify(data, null, 2));
+        console.log('Gemini response data:', JSON.stringify(data, null, 2));
         
-        if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-          throw new Error('Invalid response structure from OpenAI API');
+        if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
+          throw new Error('Invalid response structure from Gemini API');
         }
 
-        const aiResponse = data.choices[0].message.content;
+        const aiResponse = data.candidates[0].content.parts[0].text;
         console.log('AI response content:', aiResponse);
         
         // Extract JSON from the response
@@ -322,12 +323,12 @@ Generate focused clinical questions for this presentation.`;
           details: fetchError.message,
           timestamp: new Date().toISOString(),
           chiefComplaint,
-          apiKeyConfigured: !!openAIApiKey,
+          apiKeyConfigured: !!googleApiKey,
           troubleshooting: {
-            likelyCause: 'Network connectivity or OpenAI API issue',
+            likelyCause: 'Network connectivity or Gemini API issue',
             nextSteps: [
               'Check internet connectivity',
-              'Verify OpenAI API status',
+              'Verify Gemini API status',
               'Try again in a few moments'
             ]
           }
@@ -370,22 +371,23 @@ ${JSON.stringify(rosData, null, 2)}
 
 Generate differential diagnoses with clinical reasoning.`;
 
-      console.log('Sending differential diagnosis request to OpenAI...');
+      console.log('Sending differential diagnosis request to Gemini...');
 
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${googleApiKey}`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${openAIApiKey}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          model: 'gpt-4o',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt }
-          ],
-          temperature: 0.2,
-          max_tokens: 3000
+          contents: [{
+            parts: [{
+              text: `${systemPrompt}\n\n${userPrompt}`
+            }]
+          }],
+          generationConfig: {
+            maxOutputTokens: 3000,
+            temperature: 0.2
+          }
         }),
       });
 
@@ -393,12 +395,12 @@ Generate differential diagnoses with clinical reasoning.`;
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('OpenAI API error for differential:', response.status, errorText);
-        throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
+        console.error('Gemini API error for differential:', response.status, errorText);
+        throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
       }
 
       const data = await response.json();
-      const aiResponse = data.choices[0].message.content;
+      const aiResponse = data.candidates[0].content.parts[0].text;
       
       // Extract JSON from the response
       const jsonMatch = aiResponse.match(/\[[\s\S]*\]/);
@@ -477,31 +479,32 @@ ${JSON.stringify(rosData, null, 2)}
 
 Generate comprehensive clinical decision support.`;
 
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${googleApiKey}`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${openAIApiKey}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          model: 'gpt-4o',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt }
-          ],
-          temperature: 0.2,
-          max_tokens: 4000
+          contents: [{
+            parts: [{
+              text: `${systemPrompt}\n\n${userPrompt}`
+            }]
+          }],
+          generationConfig: {
+            maxOutputTokens: 4000,
+            temperature: 0.2
+          }
         }),
       });
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('OpenAI API error for clinical support:', response.status, errorText);
-        throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
+        console.error('Gemini API error for clinical support:', response.status, errorText);
+        throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
       }
 
       const data = await response.json();
-      const aiResponse = data.choices[0].message.content;
+      const aiResponse = data.candidates[0].content.parts[0].text;
       
       // Extract JSON from the response
       const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
