@@ -93,10 +93,9 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
         throw new Error(`Generated questions have invalid UUID format`);
       }
       
-      setQuestions(generatedQuestions);
       setAiServiceHealthy(true);
       
-      // Save questions to database
+      // Save questions to database BEFORE showing them to user
       if (state.currentAssessment && !questionsGenerated) {
         console.log(`Saving ${generatedQuestions.length} questions to database for assessment: ${state.currentAssessment.id}`);
         try {
@@ -106,12 +105,18 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
           });
           setQuestionsGenerated(true);
           console.log('Questions saved successfully to database');
+          
+          // Only set questions in state AFTER successful database save
+          setQuestions(generatedQuestions);
           toast.success(`${generatedQuestions.length} questions loaded and saved`);
         } catch (saveError) {
           console.error(`Failed to save questions: ${saveError.message}`);
-          toast.error('Questions generated but failed to save to database');
-          setError('Questions loaded but could not be saved. You can continue the assessment.');
+          toast.error('Failed to save questions to database. Please try again.');
+          throw new Error(`Failed to save questions: ${saveError.message}`);
         }
+      } else {
+        // If questions already generated, just set them
+        setQuestions(generatedQuestions);
       }
       
       setRetryCount(0); // Reset retry count on success
