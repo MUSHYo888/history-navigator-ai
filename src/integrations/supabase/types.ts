@@ -529,7 +529,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      user_can_access_assessment: {
+        Args: { assessment_uuid: string }
+        Returns: boolean
+      }
+      user_can_access_patient: {
+        Args: { patient_uuid: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never
