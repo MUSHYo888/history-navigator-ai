@@ -78,9 +78,7 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
       const questions = EnhancedQuestionGeneratorService.generatePhase1Questions(chiefComplaint);
       console.log(`Generated ${questions.length} Phase 1 clinical questions`);
       
-      setPhase1Questions(questions);
-      
-      // Save Phase 1 questions to database if we have an assessment
+      // Save Phase 1 questions to database BEFORE setting local state
       if (state.currentAssessment && questions.length > 0) {
         console.log(`Saving ${questions.length} Phase 1 questions to database`);
         try {
@@ -89,10 +87,30 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
             questions: questions
           });
           console.log('Phase 1 questions saved successfully');
+          
+          // Only set local state after successful database save
+          setPhase1Questions(questions);
         } catch (saveError) {
           console.error('Failed to save Phase 1 questions:', saveError);
-          // Continue anyway with local questions
+          const errorMessage = saveError?.message || 'Unknown database error';
+          
+          // Check for specific constraint violations
+          if (errorMessage.includes('questions_question_type_check')) {
+            setError('Question type not supported. Please contact support.');
+          } else if (errorMessage.includes('foreign key')) {
+            setError('Assessment validation failed. Please try creating a new assessment.');
+          } else {
+            setError(`Failed to save questions: ${errorMessage}`);
+          }
+          
+          // Do NOT continue with local questions - this prevents the foreign key error
+          return;
         }
+      } else if (!state.currentAssessment) {
+        setError('No assessment found. Please start a new assessment.');
+        return;
+      } else {
+        setPhase1Questions(questions);
       }
       
     } catch (err) {
