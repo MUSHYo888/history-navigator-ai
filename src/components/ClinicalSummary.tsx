@@ -1,21 +1,23 @@
 
-// ABOUTME: Clinical summary component displaying AI-generated differential diagnoses
-// ABOUTME: Shows assessment results, differential diagnoses with probabilities and clinical reasoning
-import React, { useState, useEffect, lazy, Suspense } from 'react';
+// ABOUTME: Comprehensive patient summary displaying complete assessment data
+// ABOUTME: Integrates history, examination, clinical decisions, and AI-generated insights
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, Brain, AlertTriangle, Activity, FileText, Send, NotepadText } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
+import { Loader2, Brain, AlertTriangle, Activity, FileText, Send, NotepadText, User, Stethoscope, ClipboardList } from 'lucide-react';
 import { AIService } from '@/services/aiService';
 import { DifferentialDiagnosis } from '@/types/medical';
 import { useMedical } from '@/context/MedicalContext';
 import { useCompleteAssessment } from '@/hooks/useAssessment';
+import { useGetClinicalDecisionSupport } from '@/hooks/useGetClinicalDecisionSupport';
 import { toast } from 'sonner';
 import { AdvancedClinicalSupport } from './AdvancedClinicalSupport';
 import { AssessmentDataSummary } from './clinical/AssessmentDataSummary';
 import { DifferentialDiagnosisList } from './clinical/DifferentialDiagnosisList';
 import { MedicalHistorySummary } from './clinical/MedicalHistorySummary';
-import { ClinicalActionsPanel } from './clinical/ClinicalActionsPanel';
+import { ClinicalDecisionSummary } from './clinical/ClinicalDecisionSummary';
 import { PDFExportButton } from './reports/PDFExportButton';
 import { SOAPNotesEditor } from './documentation/SOAPNotesEditor';
 
@@ -31,12 +33,13 @@ export function ClinicalSummary({ chiefComplaint, onComplete, onBack }: Clinical
   const [advancedSupport, setAdvancedSupport] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showInvestigations, setShowInvestigations] = useState(false);
   const [showSOAPEditor, setShowSOAPEditor] = useState(false);
   const [showReferralDialog, setShowReferralDialog] = useState(false);
-  const [showTreatment, setShowTreatment] = useState(false);
   
   const completeAssessmentMutation = useCompleteAssessment();
+  const { data: clinicalDecisionData, isLoading: clinicalDecisionLoading } = useGetClinicalDecisionSupport(
+    state.currentAssessment?.id || ''
+  );
 
   useEffect(() => {
     generateDifferentials();
@@ -91,6 +94,7 @@ export function ClinicalSummary({ chiefComplaint, onComplete, onBack }: Clinical
     if (state.currentAssessment) {
       try {
         await completeAssessmentMutation.mutateAsync(state.currentAssessment.id);
+        toast.success('Assessment completed successfully');
         onComplete();
       } catch (error) {
         console.error('Failed to complete assessment:', error);
@@ -101,32 +105,21 @@ export function ClinicalSummary({ chiefComplaint, onComplete, onBack }: Clinical
     }
   };
 
-  const handleProceedToInvestigations = () => {
-    setShowInvestigations(true);
-  };
-
-  const handleInvestigationsSubmit = (selectedInvestigations: string[], notes: string) => {
-    console.log('Investigation orders:', selectedInvestigations, notes);
-    handleCompleteAssessment();
-  };
-
-  const handleInvestigationsBack = () => {
-    setShowInvestigations(false);
-  };
-
   const handleSOAPNoteSaved = () => {
     setShowSOAPEditor(false);
     toast.success('SOAP note documentation completed');
   };
 
-  if (loading) {
+  if (loading || clinicalDecisionLoading) {
     return (
       <div className="p-6">
-        <Card className="max-w-4xl mx-auto">
+        <Card className="max-w-6xl mx-auto">
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-teal-600 mb-4" />
-            <p className="text-lg">Generating Clinical Assessment...</p>
-            <p className="text-sm text-gray-600">AI is analyzing symptoms and generating differential diagnoses</p>
+            <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+            <p className="text-lg">Generating Patient Summary...</p>
+            <p className="text-sm text-muted-foreground">
+              Compiling comprehensive assessment data and clinical decisions
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -143,59 +136,26 @@ export function ClinicalSummary({ chiefComplaint, onComplete, onBack }: Clinical
     );
   }
 
-  if (showTreatment) {
-    const TreatmentRecommendations = React.lazy(() => 
-      import('./TreatmentRecommendations').then(module => ({ default: module.TreatmentRecommendations }))
-    );
-    
-    return (
-      <React.Suspense fallback={<div>Loading...</div>}>
-        <TreatmentRecommendations
-          condition={differentials[0]?.condition || chiefComplaint}
-          severity="moderate"
-          patientData={state.currentPatient}
-          differentialDiagnoses={differentials}
-          onBack={() => setShowTreatment(false)}
-          onComplete={handleCompleteAssessment}
-        />
-      </React.Suspense>
-    );
-  }
-
-  if (showInvestigations) {
-    const InvestigationOrdering = React.lazy(() => 
-      import('./InvestigationOrdering').then(module => ({ default: module.InvestigationOrdering }))
-    );
-    
-    return (
-      <React.Suspense fallback={<div>Loading...</div>}>
-        <InvestigationOrdering
-          chiefComplaint={chiefComplaint}
-          differentialDiagnoses={differentials}
-          answers={state.answers}
-          rosData={state.rosData}
-          onSubmit={(investigations, notes) => {
-            console.log('Investigation orders:', investigations, notes);
-            setShowInvestigations(false);
-            setShowTreatment(true);
-          }}
-          onBack={handleInvestigationsBack}
-        />
-      </React.Suspense>
-    );
-  }
-
   return (
     <div className="p-6">
       <Card className="max-w-6xl mx-auto">
         <CardHeader>
           <CardTitle className="text-2xl flex items-center space-x-2">
-            <Brain className="h-6 w-6 text-teal-600" />
-            <span>Clinical Assessment Summary</span>
+            <ClipboardList className="h-6 w-6 text-primary" />
+            <span>Patient Summary & Assessment</span>
           </CardTitle>
-          <p className="text-gray-600">
-            Chief Complaint: <span className="font-medium">{chiefComplaint}</span>
-          </p>
+          <div className="flex items-center justify-between">
+            <p className="text-muted-foreground">
+              Chief Complaint: <span className="font-medium">{chiefComplaint}</span>
+            </p>
+            {state.currentPatient && (
+              <Badge variant="outline" className="flex items-center space-x-1">
+                <User className="h-3 w-3" />
+                <span>{state.currentPatient.name} • {state.currentPatient.age}y • {state.currentPatient.gender}</span>
+              </Badge>
+            )}
+          </div>
+          
           {error && (
             <div className="flex items-center space-x-2 text-amber-600 bg-amber-50 p-3 rounded-lg">
               <AlertTriangle className="h-4 w-4" />
@@ -204,11 +164,11 @@ export function ClinicalSummary({ chiefComplaint, onComplete, onBack }: Clinical
           )}
         </CardHeader>
 
-        <CardContent className="space-y-6">
-          {/* Documentation Actions */}
-          <div className="flex flex-wrap gap-3 p-4 bg-gray-50 rounded-lg">
-            <h3 className="w-full text-lg font-semibold text-gray-800 mb-2">
-              Clinical Documentation & Reporting
+        <CardContent className="space-y-8">
+          {/* Clinical Documentation Actions */}
+          <div className="flex flex-wrap gap-3 p-4 bg-muted/50 rounded-lg">
+            <h3 className="w-full text-lg font-semibold mb-2">
+              📋 Clinical Documentation & Actions
             </h3>
             
             {state.currentPatient && state.currentAssessment && (
@@ -244,18 +204,7 @@ export function ClinicalSummary({ chiefComplaint, onComplete, onBack }: Clinical
             </Button>
           </div>
 
-          {/* Advanced Clinical Decision Support */}
-          {advancedSupport && (
-            <div>
-              <h3 className="text-xl font-semibold mb-4 flex items-center">
-                <Activity className="h-5 w-5 text-purple-600 mr-2" />
-                Advanced Clinical Decision Support
-              </h3>
-              <AdvancedClinicalSupport clinicalSupport={advancedSupport} />
-            </div>
-          )}
-
-          {/* Assessment Data Summary */}
+          {/* Assessment Data Overview */}
           <AssessmentDataSummary
             answersCount={Object.keys(state.answers).length}
             rosCount={Object.keys(state.rosData).length}
@@ -263,25 +212,101 @@ export function ClinicalSummary({ chiefComplaint, onComplete, onBack }: Clinical
             differentialsCount={differentials.length}
           />
 
-          {/* Medical History Summary */}
-          <MedicalHistorySummary
-            pmhData={state.pmhData}
-            peData={state.peData}
-          />
+          <Separator />
 
-          {/* Differential Diagnoses */}
-          <DifferentialDiagnosisList differentials={differentials} />
+          {/* Medical History & Examination Summary */}
+          <div className="space-y-6">
+            <div className="flex items-center space-x-2">
+              <Stethoscope className="h-5 w-5 text-primary" />
+              <h3 className="text-xl font-semibold">History & Physical Examination</h3>
+            </div>
+            
+            <MedicalHistorySummary
+              pmhData={state.pmhData}
+              peData={state.peData}
+            />
+          </div>
 
-          {/* Action Buttons */}
-          <ClinicalActionsPanel
-            onBack={onBack}
-            onRegenerate={generateDifferentials}
-            onProceedToInvestigations={handleProceedToInvestigations}
-            onProceedToTreatment={() => setShowTreatment(true)}
-            onCompleteAssessment={handleCompleteAssessment}
-            loading={loading}
-            completing={completeAssessmentMutation.isPending}
-          />
+          <Separator />
+
+          {/* Clinical Decision Support Summary */}
+          <div className="space-y-6">
+            <div className="flex items-center space-x-2">
+              <Brain className="h-5 w-5 text-primary" />
+              <h3 className="text-xl font-semibold">Clinical Decision Support</h3>
+            </div>
+            
+            <ClinicalDecisionSummary clinicalDecisionData={clinicalDecisionData} />
+          </div>
+
+          <Separator />
+
+          {/* AI-Generated Differential Diagnoses */}
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Brain className="h-5 w-5 text-secondary" />
+                <h3 className="text-xl font-semibold">Differential Diagnosis</h3>
+              </div>
+              <Button
+                onClick={generateDifferentials}
+                variant="outline"
+                size="sm"
+                disabled={loading}
+                className="flex items-center gap-2"
+              >
+                {loading ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Brain className="h-3 w-3" />
+                )}
+                Regenerate AI Analysis
+              </Button>
+            </div>
+            
+            <DifferentialDiagnosisList differentials={differentials} />
+          </div>
+
+          {/* Advanced Clinical Decision Support */}
+          {advancedSupport && (
+            <>
+              <Separator />
+              <div className="space-y-6">
+                <div className="flex items-center space-x-2">
+                  <Activity className="h-5 w-5 text-accent" />
+                  <h3 className="text-xl font-semibold">Advanced Clinical Insights</h3>
+                </div>
+                <AdvancedClinicalSupport clinicalSupport={advancedSupport} />
+              </div>
+            </>
+          )}
+
+          <Separator />
+
+          {/* Final Actions */}
+          <div className="flex justify-between items-center pt-6">
+            <Button variant="outline" onClick={onBack}>
+              Back to Clinical Decision Support
+            </Button>
+            
+            <Button 
+              onClick={handleCompleteAssessment}
+              disabled={completeAssessmentMutation.isPending}
+              className="flex items-center space-x-2"
+            >
+              {completeAssessmentMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Completing...</span>
+                </>
+              ) : (
+                <>
+                  <FileText className="h-4 w-4" />
+                  <span>Complete Assessment</span>
+                </>
+              )}
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>
