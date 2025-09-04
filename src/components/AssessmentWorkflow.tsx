@@ -9,6 +9,7 @@ import { QuestionComponent } from './QuestionComponent';
 import { ReviewOfSystemsComponent } from './ReviewOfSystemsComponent';
 import { PastMedicalHistory } from './PastMedicalHistory';
 import { PhysicalExamination } from './PhysicalExamination';
+import { ClinicalDecisionSupport } from './ClinicalDecisionSupport';
 import { ClinicalSummary } from './ClinicalSummary';
 import { AssessmentProgress } from './AssessmentProgress';
 import { AssessmentHeader } from './AssessmentHeader';
@@ -49,6 +50,7 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
   const [showROS, setShowROS] = useState(false);
   const [showPMH, setShowPMH] = useState(false);
   const [showPE, setShowPE] = useState(false);
+  const [showClinicalDecisionSupport, setShowClinicalDecisionSupport] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
 
   const saveQuestionsMutation = useSaveQuestions();
@@ -60,7 +62,8 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
     'Review of Systems', 
     'Past Medical History',
     'Physical Examination',
-    'Assessment & Plan'
+    'Clinical Decision Support',
+    'Patient Summary & Documentation'
   ];
 
   useEffect(() => {
@@ -307,8 +310,17 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
     });
     
     setShowPE(false);
-    setShowSummary(true);
+    setShowClinicalDecisionSupport(true);
     await updateStep(5);
+  };
+
+  const handleClinicalDecisionSupportComplete = async (clinicalPlan: any) => {
+    console.log('Clinical Decision Support completed, saving plan');
+    // Store clinical plan in context or database
+    
+    setShowClinicalDecisionSupport(false);
+    setShowSummary(true);
+    await updateStep(6);
   };
 
   const handleSummaryComplete = () => {
@@ -319,8 +331,9 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
   // Calculate progress based on current phase and completion
   const calculateProgress = () => {
     if (showSummary) return 100;
-    if (showPE) return 80;
-    if (showPMH) return 60;
+    if (showClinicalDecisionSupport) return 85;
+    if (showPE) return 70;
+    if (showPMH) return 55;
     if (showROS) return 40;
     
     if (currentPhase === 1 && phase1Questions.length > 0) {
@@ -392,6 +405,20 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
         onComplete={handleSummaryComplete}
         onBack={() => {
           setShowSummary(false);
+          setShowClinicalDecisionSupport(true);
+          dispatch({ type: 'SET_STEP', payload: 5 });
+        }}
+      />
+    );
+  }
+
+  if (showClinicalDecisionSupport) {
+    return (
+      <ClinicalDecisionSupport
+        chiefComplaint={chiefComplaint}
+        onComplete={handleClinicalDecisionSupportComplete}
+        onBack={() => {
+          setShowClinicalDecisionSupport(false);
           setShowPE(true);
           dispatch({ type: 'SET_STEP', payload: 4 });
         }}

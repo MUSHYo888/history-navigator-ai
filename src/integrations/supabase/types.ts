@@ -97,6 +97,36 @@ export type Database = {
           },
         ]
       }
+      clinical_decision_support: {
+        Row: {
+          assessment_id: string
+          clinical_notes: string | null
+          created_at: string
+          id: string
+          investigation_plan: Json
+          treatment_plan: Json
+          updated_at: string
+        }
+        Insert: {
+          assessment_id: string
+          clinical_notes?: string | null
+          created_at?: string
+          id?: string
+          investigation_plan?: Json
+          treatment_plan?: Json
+          updated_at?: string
+        }
+        Update: {
+          assessment_id?: string
+          clinical_notes?: string | null
+          created_at?: string
+          id?: string
+          investigation_plan?: Json
+          treatment_plan?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
       clinical_reports: {
         Row: {
           assessment_id: string

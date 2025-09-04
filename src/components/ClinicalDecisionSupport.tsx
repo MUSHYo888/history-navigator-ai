@@ -21,12 +21,14 @@ import {
   TrendingUp,
   Shield,
   DollarSign,
-  Clock
+  Clock,
+  Loader2
 } from 'lucide-react';
 import { useInvestigationRecommendations } from '@/hooks/useInvestigationRecommendations';
 import { InvestigationIntelligenceService } from '@/services/investigationIntelligenceService';
 import { TreatmentManagementService } from '@/services/treatmentManagementService';
 import { useMedical } from '@/context/MedicalContext';
+import { useSaveClinicalDecisionSupport } from '@/hooks/useClinicalDecisionSupport';
 import { toast } from 'sonner';
 
 interface ClinicalDecisionSupportProps {
@@ -66,6 +68,7 @@ export function ClinicalDecisionSupport({
   const [loading, setLoading] = useState(true);
 
   const { state } = useMedical();
+  const saveClinicalPlanMutation = useSaveClinicalDecisionSupport();
   
   const {
     recommendations,
@@ -155,7 +158,7 @@ export function ClinicalDecisionSupport({
     return { investigationsSelected, treatmentSelected };
   };
 
-  const handleSaveClinicalPlan = () => {
+  const handleSaveClinicalPlan = async () => {
     const clinicalPlan: ClinicalPlan = {
       investigations: {
         selected: selectedInvestigations,
@@ -170,7 +173,20 @@ export function ClinicalDecisionSupport({
       clinicalNotes
     };
 
-    onComplete(clinicalPlan);
+    if (state.currentAssessment) {
+      try {
+        await saveClinicalPlanMutation.mutateAsync({
+          assessmentId: state.currentAssessment.id,
+          clinicalPlan
+        });
+        onComplete(clinicalPlan);
+      } catch (error) {
+        console.error('Failed to save clinical plan:', error);
+        toast.error('Failed to save clinical plan. Please try again.');
+      }
+    } else {
+      onComplete(clinicalPlan);
+    }
   };
 
   const { investigationsSelected, treatmentSelected } = getCompletionStatus();
@@ -457,12 +473,21 @@ export function ClinicalDecisionSupport({
             
             <Button 
               onClick={handleSaveClinicalPlan}
-              disabled={!canProceed}
+              disabled={!canProceed || saveClinicalPlanMutation.isPending}
               className="flex items-center space-x-2"
             >
-              <Save className="h-4 w-4" />
-              <span>Save Clinical Plan</span>
-              <ArrowRight className="h-4 w-4" />
+              {saveClinicalPlanMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Saving...</span>
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4" />
+                  <span>Save Clinical Plan</span>
+                  <ArrowRight className="h-4 w-4" />
+                </>
+              )}
             </Button>
           </div>
         </CardContent>
