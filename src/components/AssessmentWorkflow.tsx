@@ -14,6 +14,7 @@ import { ClinicalSummary } from './ClinicalSummary';
 import { AssessmentProgress } from './AssessmentProgress';
 import { AssessmentHeader } from './AssessmentHeader';
 import { LoadingState } from './LoadingState';
+import { ErrorBoundary } from './ErrorBoundary';
 import { useStepManager } from './StepManager';
 import { useSaveQuestions, useSaveAnswer } from '@/hooks/useAssessment';
 import { toast } from 'sonner';
@@ -52,6 +53,7 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
   const [showPE, setShowPE] = useState(false);
   const [showClinicalDecisionSupport, setShowClinicalDecisionSupport] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
+  const [stepTransitionLoading, setStepTransitionLoading] = useState(false);
 
   const saveQuestionsMutation = useSaveQuestions();
   const saveAnswerMutation = useSaveAnswer();
@@ -285,33 +287,82 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
 
   const handleROSComplete = async () => {
     console.log('ROS completed, moving to PMH');
-    setShowROS(false);
-    setShowPMH(true);
-    await updateStep(3);
+    
+    try {
+      setStepTransitionLoading(true);
+      
+      setShowROS(false);
+      setShowPMH(true);
+      await updateStep(3);
+      
+      toast.success('Review of Systems completed');
+    } catch (error) {
+      console.error('Error completing ROS:', error);
+      toast.error('Failed to complete Review of Systems');
+    } finally {
+      setStepTransitionLoading(false);
+    }
   };
 
   const handlePMHComplete = async (pmhData: any) => {
     console.log('PMH completed, saving data');
-    dispatch({
-      type: 'SET_PMH_DATA',
-      payload: pmhData
-    });
     
-    setShowPMH(false);
-    setShowPE(true);
-    await updateStep(4);
+    try {
+      setStepTransitionLoading(true);
+      
+      dispatch({
+        type: 'SET_PMH_DATA',
+        payload: pmhData
+      });
+      
+      setShowPMH(false);
+      setShowPE(true);
+      await updateStep(4);
+      
+      toast.success('Past Medical History saved');
+    } catch (error) {
+      console.error('Error completing PMH:', error);
+      toast.error('Failed to save Past Medical History');
+    } finally {
+      setStepTransitionLoading(false);
+    }
   };
 
   const handlePEComplete = async (peData: any) => {
-    console.log('PE completed, saving data');
-    dispatch({
-      type: 'SET_PE_DATA',
-      payload: peData
-    });
+    console.log('PE completed, saving data:', peData);
     
-    setShowPE(false);
-    setShowClinicalDecisionSupport(true);
-    await updateStep(5);
+    try {
+      setStepTransitionLoading(true);
+      
+      // Save PE data to context
+      dispatch({
+        type: 'SET_PE_DATA',
+        payload: peData
+      });
+      
+      console.log('PE data saved to context, proceeding to Clinical Decision Support');
+      
+      // Update UI state
+      setShowPE(false);
+      setShowClinicalDecisionSupport(true);
+      
+      // Update step in database
+      await updateStep(5);
+      
+      console.log('Successfully transitioned to Clinical Decision Support');
+      toast.success('Physical examination completed');
+      
+    } catch (error) {
+      console.error('Error completing Physical Examination:', error);
+      toast.error('Failed to save physical examination. Please try again.');
+      
+      // Don't proceed if there's an error - stay on PE page
+      setShowPE(true);
+      setShowClinicalDecisionSupport(false);
+      
+    } finally {
+      setStepTransitionLoading(false);
+    }
   };
 
   const handleClinicalDecisionSupportComplete = async (clinicalPlan: any) => {
@@ -371,7 +422,7 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
   const answeredCount = Object.keys(state.answers).length;
   const currentQuestion = getCurrentQuestion();
 
-  if (loading) {
+  if (loading || stepTransitionLoading) {
     return (
       <div className="p-6">
         <Card className="max-w-4xl mx-auto">
@@ -414,15 +465,43 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
 
   if (showClinicalDecisionSupport) {
     return (
-      <ClinicalDecisionSupport
-        chiefComplaint={chiefComplaint}
-        onComplete={handleClinicalDecisionSupportComplete}
-        onBack={() => {
-          setShowClinicalDecisionSupport(false);
-          setShowPE(true);
-          dispatch({ type: 'SET_STEP', payload: 4 });
-        }}
-      />
+      <ErrorBoundary 
+        fallback={
+          <div className="p-6">
+            <Card className="max-w-4xl mx-auto">
+              <CardContent className="p-8 text-center">
+                <AlertTriangle className="h-12 w-12 text-destructive mx-auto mb-4" />
+                <h3 className="text-lg font-medium mb-2">Clinical Decision Support Unavailable</h3>
+                <p className="text-muted-foreground mb-4">
+                  There was an issue loading the clinical decision support module.
+                </p>
+                <div className="space-x-3">
+                  <Button onClick={() => window.location.reload()}>
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Retry
+                  </Button>
+                  <Button variant="outline" onClick={() => {
+                    setShowClinicalDecisionSupport(false);
+                    setShowSummary(true);
+                  }}>
+                    Skip to Summary
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        }
+      >
+        <ClinicalDecisionSupport
+          chiefComplaint={chiefComplaint}
+          onComplete={handleClinicalDecisionSupportComplete}
+          onBack={() => {
+            setShowClinicalDecisionSupport(false);
+            setShowPE(true);
+            dispatch({ type: 'SET_STEP', payload: 4 });
+          }}
+        />
+      </ErrorBoundary>
     );
   }
 

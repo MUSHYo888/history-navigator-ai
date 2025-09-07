@@ -3,6 +3,7 @@
 // ABOUTME: Manages patient data, assessment state, answers, and clinical data
 import React, { createContext, useContext, useReducer, ReactNode } from 'react';
 import { Patient, Assessment, Answer, ReviewOfSystems } from '@/types/medical';
+import { PhysicalExamData } from '@/types/physical-exam';
 
 interface PastMedicalHistoryData {
   conditions: string[];
@@ -13,23 +14,6 @@ interface PastMedicalHistoryData {
   socialHistory: string;
 }
 
-interface PhysicalExamData {
-  vitalSigns: {
-    bloodPressure: string;
-    heartRate: string;
-    respiratoryRate: string;
-    temperature: string;
-    oxygenSaturation: string;
-  };
-  systems: {
-    [systemName: string]: {
-      normal: boolean;
-      findings: string[];
-      notes: string;
-    };
-  };
-  generalAppearance: string;
-}
 
 interface MedicalState {
   currentPatient: Patient | null;

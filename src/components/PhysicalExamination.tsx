@@ -9,29 +9,13 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { PhysicalExamData } from '@/types/physical-exam';
 
 interface PhysicalExaminationProps {
   onComplete: (data: PhysicalExamData) => void;
   onBack: () => void;
 }
 
-interface PhysicalExamData {
-  vitalSigns: {
-    bloodPressure: string;
-    heartRate: string;
-    respiratoryRate: string;
-    temperature: string;
-    oxygenSaturation: string;
-  };
-  systems: {
-    [systemName: string]: {
-      normal: boolean;
-      findings: string[];
-      notes: string;
-    };
-  };
-  generalAppearance: string;
-}
 
 const examSystems = [
   {
