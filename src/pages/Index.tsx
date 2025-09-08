@@ -5,7 +5,8 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Header } from '@/components/Header';
-    import { Dashboard } from '@/components/Dashboard';
+import { Dashboard } from '@/components/Dashboard';
+import { AdvancedAnalyticsDashboard } from '@/components/AdvancedAnalyticsDashboard';
     import { NewPatientForm } from '@/components/NewPatientForm';
     import { ChiefComplaintSelector } from '@/components/ChiefComplaintSelector';
     import { AssessmentWorkflow } from '@/components/AssessmentWorkflow';
@@ -20,7 +21,7 @@ import { useUpdatePatientAssessment } from '@/hooks/usePatients';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-type AppState = 'dashboard' | 'new-patient' | 'chief-complaint' | 'assessment' | 'patients' | 'summary' | 'resume-assessment' | 'error-recovery' | 'ai-testing';
+type AppState = 'dashboard' | 'new-patient' | 'chief-complaint' | 'assessment' | 'patients' | 'summary' | 'resume-assessment' | 'error-recovery' | 'ai-testing' | 'analytics';
 
 const Index = () => {
   const { state, dispatch } = useMedical();
@@ -204,6 +205,7 @@ const Index = () => {
             onNewPatient={handleNewPatient}
             onViewPatients={() => setCurrentView('patients')}
             onTestAI={() => setCurrentView('ai-testing')}
+            onViewAnalytics={() => setCurrentView('analytics')}
           />
         )}
 
@@ -258,6 +260,21 @@ const Index = () => {
               </Button>
             </div>
             <AIServiceTest />
+          </div>
+        )}
+
+        {currentView === 'analytics' && (
+          <div>
+            <div className="p-6 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+              <Button
+                variant="outline"
+                onClick={() => setCurrentView('dashboard')}
+                className="mb-4"
+              >
+                ← Back to Dashboard
+              </Button>
+            </div>
+            <AdvancedAnalyticsDashboard />
           </div>
         )}
 

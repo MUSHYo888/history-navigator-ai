@@ -1,20 +1,22 @@
 
 import React, { useState } from 'react';
-import { Plus, Users, Clock, FileText, Activity, Settings, Wrench } from 'lucide-react';
+import { Plus, Users, Clock, FileText, Activity, Settings, Wrench, BarChart3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { usePatients } from '@/hooks/usePatients';
 import { useDashboardStats } from '@/hooks/useDashboardStats';
 import { SystemHealth } from './SystemHealth';
+import { AdvancedAnalyticsDashboard } from './AdvancedAnalyticsDashboard';
 
 interface DashboardProps {
   onNewPatient: () => void;
   onViewPatients: () => void;
   onTestAI?: () => void;
+  onViewAnalytics?: () => void;
 }
 
-export function Dashboard({ onNewPatient, onViewPatients, onTestAI }: DashboardProps) {
+export function Dashboard({ onNewPatient, onViewPatients, onTestAI, onViewAnalytics }: DashboardProps) {
   const [showSystemHealth, setShowSystemHealth] = useState(false);
   const { data: patients, isLoading: patientsLoading } = usePatients();
   const { data: dashboardStats, isLoading: statsLoading } = useDashboardStats();
@@ -59,6 +61,16 @@ export function Dashboard({ onNewPatient, onViewPatients, onTestAI }: DashboardP
         </div>
         
         <div className="flex gap-2">
+          {onViewAnalytics && (
+            <Button
+              variant="outline"
+              onClick={onViewAnalytics}
+              className="bg-primary/5 border-primary/20 text-primary hover:bg-primary/10"
+            >
+              <BarChart3 className="h-4 w-4 mr-2" />
+              Advanced Analytics
+            </Button>
+          )}
           {onTestAI && (
             <Button
               variant="outline"
