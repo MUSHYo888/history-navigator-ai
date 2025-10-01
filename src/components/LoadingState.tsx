@@ -15,12 +15,17 @@ export function LoadingState({
   subMessage = "AI is analyzing the chief complaint" 
 }: LoadingStateProps) {
   return (
-    <div className="p-6">
-      <Card className="max-w-4xl mx-auto">
-        <CardContent className="flex flex-col items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-teal-600 mb-4" />
-          <p className="text-lg">{message}</p>
-          <p className="text-sm text-gray-600">{subMessage}</p>
+    <div className="p-4 sm:p-6 animate-fade-in-up">
+      <Card className="max-w-4xl mx-auto shadow-lg hover-lift">
+        <CardContent className="flex flex-col items-center justify-center py-8 sm:py-12 px-4">
+          <div className="relative mb-6">
+            <div className="absolute inset-0 animate-ping opacity-20">
+              <Loader2 className="h-8 w-8 sm:h-10 sm:w-10 text-primary" />
+            </div>
+            <Loader2 className="h-8 w-8 sm:h-10 sm:w-10 animate-spin text-primary relative z-10" />
+          </div>
+          <p className="text-base sm:text-lg font-medium text-center mb-2">{message}</p>
+          <p className="text-xs sm:text-sm text-muted-foreground text-center">{subMessage}</p>
         </CardContent>
       </Card>
     </div>

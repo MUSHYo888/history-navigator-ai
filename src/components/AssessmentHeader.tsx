@@ -12,18 +12,18 @@ interface AssessmentHeaderProps {
 
 export function AssessmentHeader({ chiefComplaint, error }: AssessmentHeaderProps) {
   return (
-    <>
-      <CardTitle className="text-2xl">Clinical Assessment</CardTitle>
-      <p className="text-gray-600">
-        Chief Complaint: <span className="font-medium">{chiefComplaint}</span>
+    <div className="space-y-3 animate-fade-in">
+      <CardTitle className="text-xl sm:text-2xl">Clinical Assessment</CardTitle>
+      <p className="text-sm sm:text-base text-muted-foreground">
+        Chief Complaint: <span className="font-medium text-foreground">{chiefComplaint}</span>
       </p>
       
       {error && (
-        <div className="flex items-center space-x-2 text-amber-600 bg-amber-50 p-3 rounded-lg">
-          <AlertCircle className="h-4 w-4" />
+        <div className="flex items-center space-x-2 text-warning bg-warning/10 p-3 rounded-lg animate-slide-in-left border border-warning/20">
+          <AlertCircle className="h-4 w-4 flex-shrink-0" />
           <span className="text-sm">{error}</span>
         </div>
       )}
-    </>
+    </div>
   );
 }
