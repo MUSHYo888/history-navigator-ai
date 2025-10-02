@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card"
 
 export function CardSkeleton() {
   return (
-    <Card className="animate-fade-in">
+    <Card className="animate-fade-in optimize-repaint" aria-label="Loading card content">
       <CardHeader>
         <Skeleton className="h-6 w-2/3 mb-2" />
         <Skeleton className="h-4 w-1/2" />
@@ -22,31 +22,33 @@ export function CardSkeleton() {
 
 export function TableSkeleton({ rows = 5 }: { rows?: number }) {
   return (
-    <div className="space-y-3 animate-fade-in">
+    <div className="space-y-3 animate-fade-in" role="status" aria-label="Loading table">
       <Skeleton className="h-10 w-full" />
       {Array.from({ length: rows }).map((_, i) => (
-        <Skeleton key={i} className="h-16 w-full" style={{ animationDelay: `${i * 50}ms` }} />
+        <Skeleton key={i} className="h-16 w-full optimize-repaint" style={{ animationDelay: `${i * 50}ms` }} />
       ))}
+      <span className="sr-only">Loading table data</span>
     </div>
   )
 }
 
 export function FormSkeleton() {
   return (
-    <div className="space-y-4 animate-fade-in">
+    <div className="space-y-4 animate-fade-in" role="status" aria-label="Loading form">
       {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} className="space-y-2" style={{ animationDelay: `${i * 75}ms` }}>
+        <div key={i} className="space-y-2 optimize-repaint" style={{ animationDelay: `${i * 75}ms` }}>
           <Skeleton className="h-4 w-24" />
           <Skeleton className="h-10 w-full" />
         </div>
       ))}
+      <span className="sr-only">Loading form fields</span>
     </div>
   )
 }
 
 export function DashboardSkeleton() {
   return (
-    <div className="space-y-6 p-4 sm:p-6 animate-fade-in">
+    <div className="space-y-6 p-4 sm:p-6 animate-fade-in" role="status" aria-label="Loading dashboard">
       <div className="space-y-2">
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-4 w-64" />
@@ -54,7 +56,7 @@ export function DashboardSkeleton() {
       
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
-          <Card key={i} style={{ animationDelay: `${i * 100}ms` }}>
+          <Card key={i} className="optimize-repaint" style={{ animationDelay: `${i * 100}ms` }}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <Skeleton className="h-4 w-24" />
               <Skeleton className="h-4 w-4 rounded" />
@@ -71,18 +73,20 @@ export function DashboardSkeleton() {
         <CardSkeleton />
         <CardSkeleton />
       </div>
+      <span className="sr-only">Loading dashboard content</span>
     </div>
   )
 }
 
 export function PatientListSkeleton() {
   return (
-    <div className="space-y-4 animate-fade-in">
+    <div className="space-y-4 animate-fade-in" role="status" aria-label="Loading patient list">
       <div className="flex items-center justify-between">
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-10 w-32" />
       </div>
       <TableSkeleton rows={8} />
+      <span className="sr-only">Loading patient list</span>
     </div>
   )
 }

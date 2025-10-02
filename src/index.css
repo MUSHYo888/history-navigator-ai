@@ -137,6 +137,7 @@
     @apply bg-background text-foreground;
   }
 
+  /* Respect user's motion preferences for accessibility */
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
@@ -144,49 +145,94 @@
       animation-duration: 0.01ms !important;
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+
+    .animate-fade-in,
+    .animate-fade-in-up,
+    .animate-slide-in-left,
+    .animate-slide-in-right,
+    .animate-scale-in {
+      animation: none !important;
+      opacity: 1 !important;
+      transform: none !important;
+    }
+
+    .hover-lift:hover,
+    .hover-scale:hover {
+      transform: none !important;
+    }
+  }
+
+  /* High contrast mode support */
+  @media (prefers-contrast: high) {
+    * {
+      border-width: 2px;
     }
   }
 }
 
 @layer utilities {
+  /* Performance-optimized animations using transform and opacity only */
   .animate-fade-in {
     animation: fadeIn var(--transition-smooth) ease-out;
+    will-change: opacity;
   }
 
   .animate-fade-in-up {
     animation: fadeInUp var(--transition-smooth) ease-out;
+    will-change: opacity, transform;
   }
 
   .animate-slide-in-left {
     animation: slideInLeft var(--transition-smooth) ease-out;
+    will-change: opacity, transform;
   }
 
   .animate-slide-in-right {
     animation: slideInRight var(--transition-smooth) ease-out;
+    will-change: opacity, transform;
   }
 
   .animate-scale-in {
     animation: scaleIn var(--transition-base) ease-out;
+    will-change: opacity, transform;
   }
 
+  /* GPU-accelerated transitions */
   .transition-smooth {
     transition: all var(--transition-smooth);
+    will-change: auto;
   }
 
   .transition-base {
     transition: all var(--transition-base);
+    will-change: auto;
   }
 
+  /* Performance-optimized hover effects */
   .hover-lift {
-    @apply transition-smooth hover:-translate-y-1 hover:shadow-lg;
+    @apply transition-smooth;
+    will-change: transform;
+  }
+
+  .hover-lift:hover {
+    transform: translateY(-2px) translateZ(0);
+    box-shadow: var(--shadow-lg);
   }
 
   .hover-scale {
-    @apply transition-base hover:scale-105;
+    @apply transition-base;
+    will-change: transform;
+  }
+
+  .hover-scale:hover {
+    transform: scale(1.05) translateZ(0);
   }
 
   .hover-glow {
     @apply transition-smooth;
+    will-change: box-shadow;
   }
 
   .hover-glow:hover {
@@ -213,10 +259,24 @@
   /* Transition Variants */
   .transition-fast {
     transition: all var(--transition-base);
+    will-change: auto;
   }
 
   .transition-bounce {
     transition: all var(--transition-bounce);
+    will-change: auto;
+  }
+
+  /* Accessibility: Focus visible styles */
+  .focus-visible-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2;
+  }
+
+  /* Performance: Optimize repaints */
+  .optimize-repaint {
+    transform: translateZ(0);
+    backface-visibility: hidden;
+    perspective: 1000px;
   }
 }
 
