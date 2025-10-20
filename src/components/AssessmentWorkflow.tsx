@@ -53,6 +53,7 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
   const [showPE, setShowPE] = useState(false);
   const [showClinicalDecisionSupport, setShowClinicalDecisionSupport] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
+  const [cdsRetryKey, setCdsRetryKey] = useState(0);
   const [stepTransitionLoading, setStepTransitionLoading] = useState(false);
 
   const saveQuestionsMutation = useSaveQuestions();
@@ -465,7 +466,7 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
 
   if (showClinicalDecisionSupport) {
     return (
-      <ErrorBoundary 
+      <ErrorBoundary key={cdsRetryKey} 
         fallback={
           <div className="p-6">
             <Card className="max-w-4xl mx-auto">
@@ -476,7 +477,7 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
                   There was an issue loading the clinical decision support module.
                 </p>
                 <div className="space-x-3">
-                  <Button onClick={() => window.location.reload()}>
+                  <Button onClick={() => setCdsRetryKey((k) => k + 1)}>
                     <RefreshCw className="h-4 w-4 mr-2" />
                     Retry
                   </Button>
