@@ -78,7 +78,7 @@ export function ClinicalDecisionSupport({
   const [loading, setLoading] = useState(true);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [showContinue, setShowContinue] = useState(false);
-  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const autoSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { state } = useMedical();
   const saveClinicalPlanMutation = useSaveClinicalDecisionSupport();
