@@ -130,6 +130,7 @@ const Index = () => {
         .single();
 
       if (error) throw error;
+      if (!assessment) throw new Error('Assessment not found');
 
       // Set up the context
       dispatch({ 
