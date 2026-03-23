@@ -126,6 +126,53 @@ export type Database = {
           },
         ]
       }
+      clinical_reports: {
+        Row: {
+          assessment_id: string
+          content: Json | null
+          file_path: string | null
+          format: string | null
+          generated_at: string
+          generated_by: string | null
+          id: string
+          metadata: Json | null
+          report_type: string
+          title: string
+        }
+        Insert: {
+          assessment_id: string
+          content?: Json | null
+          file_path?: string | null
+          format?: string | null
+          generated_at?: string
+          generated_by?: string | null
+          id?: string
+          metadata?: Json | null
+          report_type: string
+          title: string
+        }
+        Update: {
+          assessment_id?: string
+          content?: Json | null
+          file_path?: string | null
+          format?: string | null
+          generated_at?: string
+          generated_by?: string | null
+          id?: string
+          metadata?: Json | null
+          report_type?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clinical_reports_assessment_id_fkey"
+            columns: ["assessment_id"]
+            isOneToOne: false
+            referencedRelation: "assessments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       differential_diagnoses: {
         Row: {
           assessment_id: string
@@ -229,6 +276,79 @@ export type Database = {
           },
         ]
       }
+      progress_notes: {
+        Row: {
+          assessment_changes: string | null
+          assessment_id: string | null
+          chief_complaint: string | null
+          created_at: string
+          examination_changes: string | null
+          follow_up_instructions: string | null
+          id: string
+          interval_history: string | null
+          investigation_results: string | null
+          patient_id: string
+          plan_modifications: string | null
+          previous_assessment_id: string | null
+          updated_at: string
+          visit_date: string
+        }
+        Insert: {
+          assessment_changes?: string | null
+          assessment_id?: string | null
+          chief_complaint?: string | null
+          created_at?: string
+          examination_changes?: string | null
+          follow_up_instructions?: string | null
+          id?: string
+          interval_history?: string | null
+          investigation_results?: string | null
+          patient_id: string
+          plan_modifications?: string | null
+          previous_assessment_id?: string | null
+          updated_at?: string
+          visit_date?: string
+        }
+        Update: {
+          assessment_changes?: string | null
+          assessment_id?: string | null
+          chief_complaint?: string | null
+          created_at?: string
+          examination_changes?: string | null
+          follow_up_instructions?: string | null
+          id?: string
+          interval_history?: string | null
+          investigation_results?: string | null
+          patient_id?: string
+          plan_modifications?: string | null
+          previous_assessment_id?: string | null
+          updated_at?: string
+          visit_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "progress_notes_assessment_id_fkey"
+            columns: ["assessment_id"]
+            isOneToOne: false
+            referencedRelation: "assessments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "progress_notes_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "progress_notes_previous_assessment_id_fkey"
+            columns: ["previous_assessment_id"]
+            isOneToOne: false
+            referencedRelation: "assessments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       questions: {
         Row: {
           assessment_id: string
@@ -270,6 +390,101 @@ export type Database = {
           },
         ]
       }
+      referral_letters: {
+        Row: {
+          assessment_id: string
+          clinical_question: string | null
+          created_at: string
+          examination_findings: string | null
+          id: string
+          investigations_completed: string | null
+          letter_content: Json | null
+          recipient_facility: string | null
+          recipient_name: string | null
+          relevant_history: string | null
+          sent_at: string | null
+          specialty: string
+          status: string | null
+          urgency: string | null
+        }
+        Insert: {
+          assessment_id: string
+          clinical_question?: string | null
+          created_at?: string
+          examination_findings?: string | null
+          id?: string
+          investigations_completed?: string | null
+          letter_content?: Json | null
+          recipient_facility?: string | null
+          recipient_name?: string | null
+          relevant_history?: string | null
+          sent_at?: string | null
+          specialty: string
+          status?: string | null
+          urgency?: string | null
+        }
+        Update: {
+          assessment_id?: string
+          clinical_question?: string | null
+          created_at?: string
+          examination_findings?: string | null
+          id?: string
+          investigations_completed?: string | null
+          letter_content?: Json | null
+          recipient_facility?: string | null
+          recipient_name?: string | null
+          relevant_history?: string | null
+          sent_at?: string | null
+          specialty?: string
+          status?: string | null
+          urgency?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referral_letters_assessment_id_fkey"
+            columns: ["assessment_id"]
+            isOneToOne: false
+            referencedRelation: "assessments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      report_templates: {
+        Row: {
+          active: boolean | null
+          created_at: string
+          default_template: boolean | null
+          id: string
+          name: string
+          specialty: string | null
+          template_content: Json | null
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean | null
+          created_at?: string
+          default_template?: boolean | null
+          id?: string
+          name: string
+          specialty?: string | null
+          template_content?: Json | null
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean | null
+          created_at?: string
+          default_template?: boolean | null
+          id?: string
+          name?: string
+          specialty?: string | null
+          template_content?: Json | null
+          type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       review_of_systems: {
         Row: {
           assessment_id: string
@@ -298,6 +513,56 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "review_of_systems_assessment_id_fkey"
+            columns: ["assessment_id"]
+            isOneToOne: false
+            referencedRelation: "assessments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      soap_notes: {
+        Row: {
+          additional_notes: string | null
+          assessment_id: string
+          assessment_text: string | null
+          author: string | null
+          created_at: string
+          id: string
+          objective: string | null
+          plan_text: string | null
+          subjective: string | null
+          template_used: string | null
+          updated_at: string
+        }
+        Insert: {
+          additional_notes?: string | null
+          assessment_id: string
+          assessment_text?: string | null
+          author?: string | null
+          created_at?: string
+          id?: string
+          objective?: string | null
+          plan_text?: string | null
+          subjective?: string | null
+          template_used?: string | null
+          updated_at?: string
+        }
+        Update: {
+          additional_notes?: string | null
+          assessment_id?: string
+          assessment_text?: string | null
+          author?: string | null
+          created_at?: string
+          id?: string
+          objective?: string | null
+          plan_text?: string | null
+          subjective?: string | null
+          template_used?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "soap_notes_assessment_id_fkey"
             columns: ["assessment_id"]
             isOneToOne: false
             referencedRelation: "assessments"
