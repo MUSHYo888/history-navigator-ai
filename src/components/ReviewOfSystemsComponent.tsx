@@ -1,8 +1,10 @@
 
+// ABOUTME: Review of Systems component with 3-state toggles (Positive/Negative/Not Asked)
+// ABOUTME: Includes gender-based smart filtering and auto-flagging of positive findings
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useMedical } from '@/context/MedicalContext';
@@ -10,13 +12,15 @@ import { useSaveROS } from '@/hooks/useAssessment';
 import { 
   Eye, Heart, Zap, Activity, Circle, 
   Brain, Bone, Smile, PersonStanding, 
-  Thermometer, Shield, Baby 
+  Thermometer, Shield, Baby,
+  Plus, Minus
 } from 'lucide-react';
 
 interface ROSSystem {
   name: string;
   icon: any;
   symptoms: string[];
+  genderFilter?: 'male' | 'female';
 }
 
 const rosSystems: ROSSystem[] = [
@@ -51,6 +55,18 @@ const rosSystems: ROSSystem[] = [
     symptoms: ['Dysuria', 'Frequency', 'Urgency', 'Hematuria', 'Incontinence']
   },
   {
+    name: 'Genitourinary - Female',
+    icon: Baby,
+    symptoms: ['Menstrual irregularities', 'Vaginal discharge', 'Pelvic pain', 'Pregnancy status'],
+    genderFilter: 'female'
+  },
+  {
+    name: 'Genitourinary - Male',
+    icon: Circle,
+    symptoms: ['Testicular pain', 'Erectile dysfunction', 'Urethral discharge'],
+    genderFilter: 'male'
+  },
+  {
     name: 'Musculoskeletal',
     icon: Bone,
     symptoms: ['Joint pain', 'Muscle pain', 'Back pain', 'Stiffness', 'Swelling']
@@ -82,6 +98,8 @@ const rosSystems: ROSSystem[] = [
   }
 ];
 
+type SymptomState = 'positive' | 'negative' | null;
+
 interface ReviewOfSystemsComponentProps {
   onComplete: () => void;
   onBack: () => void;
@@ -89,58 +107,85 @@ interface ReviewOfSystemsComponentProps {
 
 export function ReviewOfSystemsComponent({ onComplete, onBack }: ReviewOfSystemsComponentProps) {
   const { state, dispatch } = useMedical();
-  const [selectedSymptoms, setSelectedSymptoms] = useState<Record<string, string[]>>({});
+  const [symptomStates, setSymptomStates] = useState<Record<string, Record<string, SymptomState>>>({});
   const [systemNotes, setSystemNotes] = useState<Record<string, string>>({});
   const saveROSMutation = useSaveROS();
 
+  const patientGender = state.currentPatient?.gender;
+
+  const filteredSystems = rosSystems.filter(system => {
+    if (!system.genderFilter) return true;
+    return system.genderFilter === patientGender;
+  });
+
   const toggleSymptom = (systemName: string, symptom: string) => {
-    setSelectedSymptoms(prev => {
-      const systemSymptoms = prev[systemName] || [];
-      const updatedSymptoms = systemSymptoms.includes(symptom)
-        ? systemSymptoms.filter(s => s !== symptom)
-        : [...systemSymptoms, symptom];
-      
-      return { ...prev, [systemName]: updatedSymptoms };
+    setSymptomStates(prev => {
+      const systemSymptoms = prev[systemName] || {};
+      const current = systemSymptoms[symptom] || null;
+      // Cycle: null -> positive -> negative -> null
+      let next: SymptomState;
+      if (current === null) next = 'positive';
+      else if (current === 'positive') next = 'negative';
+      else next = null;
+
+      return {
+        ...prev,
+        [systemName]: { ...systemSymptoms, [symptom]: next }
+      };
     });
+  };
+
+  const setSymptomDirect = (systemName: string, symptom: string, value: SymptomState) => {
+    setSymptomStates(prev => ({
+      ...prev,
+      [systemName]: { ...(prev[systemName] || {}), [symptom]: value }
+    }));
   };
 
   const handleSystemNotes = (systemName: string, notes: string) => {
     setSystemNotes(prev => ({ ...prev, [systemName]: notes }));
   };
 
+  const getPositiveSymptoms = (systemName: string): string[] => {
+    const systemSymptoms = symptomStates[systemName] || {};
+    return Object.entries(systemSymptoms)
+      .filter(([, state]) => state === 'positive')
+      .map(([symptom]) => symptom);
+  };
+
+  const getNegativeSymptoms = (systemName: string): string[] => {
+    const systemSymptoms = symptomStates[systemName] || {};
+    return Object.entries(systemSymptoms)
+      .filter(([, state]) => state === 'negative')
+      .map(([symptom]) => symptom);
+  };
+
   const handleComplete = async () => {
-    // Prepare ROS data for context update
     const rosDataForContext: Record<string, any> = {};
     
-    Object.keys(selectedSymptoms).forEach(systemName => {
-      rosDataForContext[systemName] = {
-        positive: selectedSymptoms[systemName] || [],
-        negative: [], // Could track explicitly denied symptoms
-        notes: systemNotes[systemName]
-      };
+    filteredSystems.forEach(system => {
+      const positive = getPositiveSymptoms(system.name);
+      const negative = getNegativeSymptoms(system.name);
+      if (positive.length > 0 || negative.length > 0 || systemNotes[system.name]) {
+        rosDataForContext[system.name] = {
+          positive,
+          negative,
+          notes: systemNotes[system.name] || ''
+        };
+      }
     });
 
-    // Update context with ROS data
-    dispatch({
-      type: 'SET_ROS_DATA',
-      payload: rosDataForContext
-    });
+    dispatch({ type: 'SET_ROS_DATA', payload: rosDataForContext });
 
-    // Save ROS data to database
     if (state.currentAssessment) {
       try {
-        const savePromises = Object.keys(selectedSymptoms).map(systemName => 
+        const savePromises = Object.keys(rosDataForContext).map(systemName =>
           saveROSMutation.mutateAsync({
             assessmentId: state.currentAssessment!.id,
             systemName,
-            rosData: {
-              positive: selectedSymptoms[systemName] || [],
-              negative: [],
-              notes: systemNotes[systemName]
-            }
+            rosData: rosDataForContext[systemName]
           })
         );
-        
         await Promise.all(savePromises);
         console.log('ROS data saved to database');
       } catch (error) {
@@ -151,82 +196,120 @@ export function ReviewOfSystemsComponent({ onComplete, onBack }: ReviewOfSystems
     onComplete();
   };
 
-  const totalPositiveSymptoms = Object.values(selectedSymptoms).flat().length;
+  const totalPositive = filteredSystems.reduce((sum, sys) => sum + getPositiveSymptoms(sys.name).length, 0);
+  const totalNegative = filteredSystems.reduce((sum, sys) => sum + getNegativeSymptoms(sys.name).length, 0);
 
   return (
     <div className="p-6">
       <Card className="max-w-6xl mx-auto">
         <CardHeader>
           <CardTitle className="text-2xl text-center">Review of Systems</CardTitle>
-          <p className="text-center text-gray-600">
-            Check any symptoms the patient is currently experiencing
+          <p className="text-center text-muted-foreground">
+            Mark each symptom as Positive (+) or Negative (-). Click once for positive, twice for negative.
           </p>
-          <div className="bg-blue-50 p-4 rounded-lg">
-            <p className="text-sm text-blue-800">
-              <strong>{totalPositiveSymptoms}</strong> positive symptoms selected
-            </p>
+          <div className="flex gap-4 justify-center">
+            <div className="bg-red-50 border border-red-200 px-4 py-2 rounded-lg">
+              <span className="text-sm text-red-800 font-medium">
+                <Plus className="h-3 w-3 inline mr-1" />
+                {totalPositive} Positive
+              </span>
+            </div>
+            <div className="bg-green-50 border border-green-200 px-4 py-2 rounded-lg">
+              <span className="text-sm text-green-800 font-medium">
+                <Minus className="h-3 w-3 inline mr-1" />
+                {totalNegative} Negative
+              </span>
+            </div>
           </div>
         </CardHeader>
 
         <CardContent className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {rosSystems.map((system) => (
-              <Card key={system.name} className="border-l-4 border-l-teal-500">
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center space-x-2 text-lg">
-                    <system.icon className="h-5 w-5 text-teal-600" />
-                    <span>{system.name}</span>
-                    {selectedSymptoms[system.name]?.length > 0 && (
-                      <span className="bg-teal-100 text-teal-800 text-xs px-2 py-1 rounded-full">
-                        {selectedSymptoms[system.name].length}
-                      </span>
-                    )}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="grid grid-cols-1 gap-2">
-                    {system.symptoms.map((symptom) => (
-                      <div key={symptom} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`${system.name}-${symptom}`}
-                          checked={selectedSymptoms[system.name]?.includes(symptom) || false}
-                          onCheckedChange={() => toggleSymptom(system.name, symptom)}
-                        />
-                        <Label 
-                          htmlFor={`${system.name}-${symptom}`}
-                          className="text-sm cursor-pointer"
-                        >
-                          {symptom}
-                        </Label>
+            {filteredSystems.map((system) => {
+              const positiveCount = getPositiveSymptoms(system.name).length;
+              const negativeCount = getNegativeSymptoms(system.name).length;
+
+              return (
+                <Card key={system.name} className="border-l-4 border-l-primary/60">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center justify-between text-lg">
+                      <div className="flex items-center space-x-2">
+                        <system.icon className="h-5 w-5 text-primary" />
+                        <span>{system.name}</span>
                       </div>
-                    ))}
-                  </div>
-                  
-                  {selectedSymptoms[system.name]?.length > 0 && (
-                    <div>
-                      <Label className="text-xs text-gray-600">Additional details</Label>
-                      <Textarea
-                        placeholder={`Additional details about ${system.name.toLowerCase()} symptoms...`}
-                        value={systemNotes[system.name] || ''}
-                        onChange={(e) => handleSystemNotes(system.name, e.target.value)}
-                        rows={2}
-                        className="text-sm"
-                      />
+                      <div className="flex gap-1">
+                        {positiveCount > 0 && (
+                          <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full">
+                            +{positiveCount}
+                          </span>
+                        )}
+                        {negativeCount > 0 && (
+                          <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
+                            -{negativeCount}
+                          </span>
+                        )}
+                      </div>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="grid grid-cols-1 gap-2">
+                      {system.symptoms.map((symptom) => {
+                        const currentState = symptomStates[system.name]?.[symptom] || null;
+                        return (
+                          <div key={symptom} className="flex items-center justify-between py-1">
+                            <span className="text-sm">{symptom}</span>
+                            <div className="flex gap-1">
+                              <button
+                                type="button"
+                                onClick={() => setSymptomDirect(system.name, symptom, currentState === 'positive' ? null : 'positive')}
+                                className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                                  currentState === 'positive'
+                                    ? 'bg-red-500 text-white'
+                                    : 'bg-muted text-muted-foreground hover:bg-red-100'
+                                }`}
+                              >
+                                <Plus className="h-3 w-3" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setSymptomDirect(system.name, symptom, currentState === 'negative' ? null : 'negative')}
+                                className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                                  currentState === 'negative'
+                                    ? 'bg-green-500 text-white'
+                                    : 'bg-muted text-muted-foreground hover:bg-green-100'
+                                }`}
+                              >
+                                <Minus className="h-3 w-3" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
+                    
+                    {positiveCount > 0 && (
+                      <div>
+                        <Label className="text-xs text-muted-foreground">Additional details</Label>
+                        <Textarea
+                          placeholder={`Details about ${system.name.toLowerCase()} symptoms...`}
+                          value={systemNotes[system.name] || ''}
+                          onChange={(e) => handleSystemNotes(system.name, e.target.value)}
+                          rows={2}
+                          className="text-sm"
+                        />
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
 
           <div className="flex justify-between pt-6">
             <Button variant="outline" onClick={onBack}>
               Back to History
             </Button>
-            <Button 
-              onClick={handleComplete}
-              className="bg-teal-600 hover:bg-teal-700"
-            >
+            <Button onClick={handleComplete}>
               Continue to Assessment Summary
             </Button>
           </div>
