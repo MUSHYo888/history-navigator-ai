@@ -1,19 +1,19 @@
 
 // ABOUTME: Main application page handling workflow state and navigation with enhanced error recovery
-// ABOUTME: Orchestrates patient creation, assessment workflow, and data persistence with comprehensive error handling
+// ABOUTME: Orchestrates patient creation, assessment workflow, and data persistence with localStorage session persistence
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Header } from '@/components/Header';
 import { Dashboard } from '@/components/Dashboard';
 import { AdvancedAnalyticsDashboard } from '@/components/AdvancedAnalyticsDashboard';
-    import { NewPatientForm } from '@/components/NewPatientForm';
-    import { ChiefComplaintSelector } from '@/components/ChiefComplaintSelector';
-    import { AssessmentWorkflow } from '@/components/AssessmentWorkflow';
-    import { PatientList } from '@/components/PatientList';
-    import { AssessmentResume } from '@/components/AssessmentResume';
-    import { AssessmentErrorRecovery } from '@/components/AssessmentErrorRecovery';
-    import { AIServiceTest } from '@/components/AIServiceTest';
+import { NewPatientForm } from '@/components/NewPatientForm';
+import { ChiefComplaintSelector } from '@/components/ChiefComplaintSelector';
+import { AssessmentWorkflow } from '@/components/AssessmentWorkflow';
+import { PatientList } from '@/components/PatientList';
+import { AssessmentResume } from '@/components/AssessmentResume';
+import { AssessmentErrorRecovery } from '@/components/AssessmentErrorRecovery';
+import { AIServiceTest } from '@/components/AIServiceTest';
 import { Patient, Assessment } from '@/types/medical';
 import { useMedical } from '@/context/MedicalContext';
 import { useCreateAssessment, useUpdateAssessmentStep, useAssessment } from '@/hooks/useAssessment';
@@ -23,14 +23,87 @@ import { toast } from 'sonner';
 
 type AppState = 'dashboard' | 'new-patient' | 'chief-complaint' | 'assessment' | 'patients' | 'summary' | 'resume-assessment' | 'error-recovery' | 'ai-testing' | 'analytics';
 
+const SESSION_KEYS = {
+  assessmentId: 'history-pro:active-assessment-id',
+  patientId: 'history-pro:active-patient-id',
+};
+
 const Index = () => {
   const { state, dispatch } = useMedical();
   const [currentView, setCurrentView] = useState<AppState>('dashboard');
   const [selectedComplaint, setSelectedComplaint] = useState<string>('');
   const [globalError, setGlobalError] = useState<string | null>(null);
+  const [sessionChecked, setSessionChecked] = useState(false);
   
   const createAssessmentMutation = useCreateAssessment();
   const updatePatientMutation = useUpdatePatientAssessment();
+
+  // Check for active session on mount
+  useEffect(() => {
+    const checkActiveSession = async () => {
+      try {
+        const savedAssessmentId = localStorage.getItem(SESSION_KEYS.assessmentId);
+        if (!savedAssessmentId) {
+          setSessionChecked(true);
+          return;
+        }
+
+        const { data: assessment, error } = await supabase
+          .from('assessments')
+          .select('*, patients!inner(*)')
+          .eq('id', savedAssessmentId)
+          .eq('status', 'in-progress')
+          .single();
+
+        if (error || !assessment) {
+          // Clear stale session
+          localStorage.removeItem(SESSION_KEYS.assessmentId);
+          localStorage.removeItem(SESSION_KEYS.patientId);
+          setSessionChecked(true);
+          return;
+        }
+
+        // Restore session
+        dispatch({
+          type: 'SET_CURRENT_PATIENT',
+          payload: {
+            id: assessment.patients.id,
+            name: assessment.patients.name,
+            age: assessment.patients.age,
+            gender: assessment.patients.gender as 'male' | 'female' | 'other',
+            patientId: assessment.patients.patient_id,
+            location: assessment.patients.location,
+            createdAt: assessment.patients.created_at,
+          },
+        });
+
+        dispatch({
+          type: 'SET_CURRENT_ASSESSMENT',
+          payload: {
+            id: assessment.id,
+            patientId: assessment.patient_id,
+            chiefComplaint: assessment.chief_complaint,
+            status: assessment.status as 'in-progress' | 'completed' | 'draft',
+            currentStep: assessment.current_step,
+            createdAt: assessment.created_at,
+            updatedAt: assessment.updated_at,
+          },
+        });
+
+        setSelectedComplaint(assessment.chief_complaint);
+        setCurrentView('assessment');
+        toast.info('Resumed your in-progress assessment');
+      } catch (err) {
+        console.error('Failed to restore session:', err);
+        localStorage.removeItem(SESSION_KEYS.assessmentId);
+        localStorage.removeItem(SESSION_KEYS.patientId);
+      } finally {
+        setSessionChecked(true);
+      }
+    };
+
+    checkActiveSession();
+  }, []);
 
   const handleError = (error: string, context?: string) => {
     console.error(`Global error in ${context || 'unknown context'}:`, error);
@@ -56,6 +129,7 @@ const Index = () => {
     try {
       console.log('Patient created:', patient);
       dispatch({ type: 'SET_CURRENT_PATIENT', payload: patient });
+      localStorage.setItem(SESSION_KEYS.patientId, patient.id);
       setCurrentView('chief-complaint');
     } catch (error) {
       handleError(error.message, 'patient creation');
@@ -72,7 +146,6 @@ const Index = () => {
 
       console.log('Creating assessment for patient:', state.currentPatient.id, 'with complaint:', complaint);
 
-      // Create new assessment in database
       const assessment = await createAssessmentMutation.mutateAsync({
         patientId: state.currentPatient.id,
         chiefComplaint: complaint
@@ -80,13 +153,15 @@ const Index = () => {
       
       console.log('Assessment created:', assessment);
       
-      // Update patient's last assessment timestamp
       await updatePatientMutation.mutateAsync(state.currentPatient.id);
       
-      // Set assessment in context
       dispatch({ type: 'SET_CURRENT_ASSESSMENT', payload: assessment });
+
+      // Persist active session
+      localStorage.setItem(SESSION_KEYS.assessmentId, assessment.id);
+      localStorage.setItem(SESSION_KEYS.patientId, state.currentPatient.id);
+
       setCurrentView('assessment');
-      
       toast.success('Assessment started successfully');
     } catch (error) {
       console.error('Failed to create assessment:', error);
@@ -97,6 +172,9 @@ const Index = () => {
   const handleAssessmentComplete = () => {
     try {
       console.log('Assessment completed successfully');
+      // Clear active session
+      localStorage.removeItem(SESSION_KEYS.assessmentId);
+      localStorage.removeItem(SESSION_KEYS.patientId);
       setCurrentView('summary');
       toast.success('Assessment completed!');
     } catch (error) {
@@ -107,6 +185,8 @@ const Index = () => {
   const handleBackToDashboard = () => {
     try {
       dispatch({ type: 'RESET_ASSESSMENT' });
+      localStorage.removeItem(SESSION_KEYS.assessmentId);
+      localStorage.removeItem(SESSION_KEYS.patientId);
       setCurrentView('dashboard');
       setSelectedComplaint('');
       setGlobalError(null);
@@ -119,20 +199,15 @@ const Index = () => {
     try {
       console.log('Resuming assessment:', assessmentId);
       
-      // Load the assessment details
       const { data: assessment, error } = await supabase
         .from('assessments')
-        .select(`
-          *,
-          patients!inner(*)
-        `)
+        .select(`*, patients!inner(*)`)
         .eq('id', assessmentId)
         .single();
 
       if (error) throw error;
       if (!assessment) throw new Error('Assessment not found');
 
-      // Set up the context
       dispatch({ 
         type: 'SET_CURRENT_PATIENT', 
         payload: {
@@ -159,6 +234,10 @@ const Index = () => {
         }
       });
 
+      // Persist active session
+      localStorage.setItem(SESSION_KEYS.assessmentId, assessment.id);
+      localStorage.setItem(SESSION_KEYS.patientId, assessment.patients.id);
+
       setSelectedComplaint(assessment.chief_complaint);
       setCurrentView('assessment');
       
@@ -169,13 +248,20 @@ const Index = () => {
     }
   };
 
+  if (!sessionChecked) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <p className="text-muted-foreground">Loading...</p>
+      </div>
+    );
+  }
+
   if (currentView === 'error-recovery') {
     return (
       <AssessmentErrorRecovery
         error={globalError || 'Unknown error occurred'}
         onRetry={() => {
           setGlobalError(null);
-          // Try to return to the previous state
           if (state.currentAssessment) {
             setCurrentView('assessment');
           } else if (state.currentPatient) {
