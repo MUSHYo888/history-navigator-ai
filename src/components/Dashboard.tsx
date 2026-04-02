@@ -1,5 +1,7 @@
 
-import React, { useState } from 'react';
+// ABOUTME: Main clinical dashboard with stats, patient list, and system health
+// ABOUTME: Includes realtime subscriptions for live patient and assessment updates
+import React, { useState, useEffect } from 'react';
 import { Plus, Users, Clock, FileText, Activity, Settings, Wrench, BarChart3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,6 +10,8 @@ import { usePatients } from '@/hooks/usePatients';
 import { useDashboardStats } from '@/hooks/useDashboardStats';
 import { SystemHealth } from './SystemHealth';
 import { AdvancedAnalyticsDashboard } from './AdvancedAnalyticsDashboard';
+import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface DashboardProps {
   onNewPatient: () => void;
