@@ -1,13 +1,17 @@
 
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
+// ABOUTME: AI assistant edge function for clinical question generation, differential diagnosis, and clinical support
+// ABOUTME: Uses Lovable AI Gateway (OpenAI-compatible) with LOVABLE_API_KEY for all AI features
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-// Helper function to generate UUID v4
+const AI_GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
+const MODEL = "google/gemini-3-flash-preview";
+
 function generateUUID(): string {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
     const r = Math.random() * 16 | 0;
@@ -16,27 +20,48 @@ function generateUUID(): string {
   });
 }
 
-// Helper function to log errors with context
-function logError(context: string, error: any, additionalInfo?: any) {
-  console.error(`[${context}] Error:`, {
-    message: error.message,
-    stack: error.stack,
-    timestamp: new Date().toISOString(),
-    additionalInfo
+async function callAI(systemPrompt: string, userPrompt: string, maxTokens = 2000): Promise<string> {
+  const apiKey = Deno.env.get('LOVABLE_API_KEY');
+  if (!apiKey) throw new Error('LOVABLE_API_KEY is not configured');
+
+  const response = await fetch(AI_GATEWAY_URL, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+      max_tokens: maxTokens,
+      temperature: 0.3,
+    }),
   });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('AI Gateway error:', response.status, errorText);
+    if (response.status === 429) {
+      throw new Error('Rate limit exceeded. Please try again later.');
+    }
+    if (response.status === 402) {
+      throw new Error('AI credits exhausted. Please add funds in Settings > Workspace > Usage.');
+    }
+    throw new Error(`AI Gateway error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  return data.choices[0].message.content;
 }
 
-interface GenerateQuestionsRequest {
-  action: string;
-  chiefComplaint: string;
-  previousAnswers?: Record<string, any>;
-}
-
-interface GenerateDifferentialRequest {
-  action: string;
-  chiefComplaint: string;
-  answers: Record<string, any>;
-  rosData?: Record<string, any>;
+function extractJSON(text: string, type: 'array' | 'object'): any {
+  const pattern = type === 'array' ? /\[[\s\S]*\]/ : /\{[\s\S]*\}/;
+  const match = text.match(pattern);
+  if (!match) throw new Error(`No JSON ${type} found in AI response`);
+  return JSON.parse(match[0]);
 }
 
 serve(async (req) => {
@@ -45,145 +70,51 @@ serve(async (req) => {
   }
 
   try {
-    console.log('=== AI Assistant Function Called ===');
-    console.log('Timestamp:', new Date().toISOString());
-    console.log('Method:', req.method);
-    console.log('URL:', req.url);
-
-    // Check Google API Key
-    const googleApiKey = Deno.env.get('GOOGLE_API');
-    console.log('Environment check:', {
-      hasGoogleKey: !!googleApiKey,
-      keyLength: googleApiKey ? googleApiKey.length : 0,
-      keyPreview: googleApiKey ? googleApiKey.substring(0, 12) + '...' : 'NOT_SET'
-    });
-
-    if (!googleApiKey) {
-      const errorResponse = { 
-        error: 'GOOGLE_API is not configured in Supabase secrets',
-        timestamp: new Date().toISOString(),
-        function: 'ai-assistant',
-        details: 'Please configure the GOOGLE_API in your Supabase project settings under Edge Functions > Secrets'
-      };
-      console.error('API Key Error:', errorResponse);
-      return new Response(JSON.stringify(errorResponse), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Parse request body with error handling
-    let requestBody;
-    try {
-      const bodyText = await req.text();
-      console.log('Raw request body:', bodyText);
-      requestBody = JSON.parse(bodyText);
-      console.log('Parsed request body:', JSON.stringify(requestBody, null, 2));
-    } catch (parseError) {
-      const errorResponse = {
-        error: 'Invalid JSON in request body',
-        details: parseError.message,
-        timestamp: new Date().toISOString()
-      };
-      logError('JSON_PARSE', parseError, { requestBody: 'FAILED_TO_PARSE' });
-      return new Response(JSON.stringify(errorResponse), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-    
+    const requestBody = await req.json();
     const { action, chiefComplaint } = requestBody;
-    
+
     if (!action) {
-      const errorResponse = { 
-        error: 'Action parameter is required',
-        availableActions: ['generate-questions', 'generate-differential', 'generate-clinical-support', 'health-check', 'test'],
-        timestamp: new Date().toISOString()
-      };
-      console.error('Missing action parameter');
-      return new Response(JSON.stringify(errorResponse), {
+      return new Response(JSON.stringify({ error: 'Action parameter is required' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    console.log(`Processing action: "${action}" for chief complaint: "${chiefComplaint}"`);
+    console.log(`[ai-assistant] action="${action}" chiefComplaint="${chiefComplaint}"`);
 
-    // Handle health check
-    if (action === 'health-check') {
-      const healthData = {
+    // Health check
+    if (action === 'health-check' || action === 'test') {
+      return new Response(JSON.stringify({
         status: 'healthy',
         timestamp: new Date().toISOString(),
         service: 'ai-assistant',
-        version: '2.0.0',
-        environment: {
-          hasGoogleKey: !!googleApiKey,
-          googleKeyLength: googleApiKey ? googleApiKey.length : 0,
-          denoVersion: Deno.version.deno,
-          keyStatus: googleApiKey ? 'CONFIGURED' : 'MISSING',
-          keyPrefix: googleApiKey ? googleApiKey.substring(0, 8) + '...' : 'N/A'
-        },
-        endpoints: {
-          'generate-questions': 'available',
-          'generate-differential': 'available', 
-          'generate-clinical-support': 'available',
-          'health-check': 'available',
-          'test': 'available'
-        }
-      };
-      
-      console.log('Health check response:', healthData);
-      
-      return new Response(JSON.stringify(healthData), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      });
-    }
-
-    // Test endpoint
-    if (action === 'test') {
-      console.log('Test endpoint called - function is operational');
-      const testResponse = { 
-        status: 'healthy', 
-        timestamp: new Date().toISOString(),
-        message: 'AI Assistant function is operational',
-        googleConfigured: !!googleApiKey,
-        version: '2.0.0',
-        testResult: 'PASS'
-      };
-      console.log('Test response:', testResponse);
-      return new Response(JSON.stringify(testResponse), {
+        version: '3.0.0',
+        gateway: 'lovable-ai',
+        hasApiKey: !!Deno.env.get('LOVABLE_API_KEY'),
+      }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     if (action === 'generate-questions') {
-      const { previousAnswers = {} }: GenerateQuestionsRequest = requestBody;
-      
-      if (!chiefComplaint || typeof chiefComplaint !== 'string') {
-        const errorResponse = {
-          error: 'Chief complaint is required and must be a string',
-          received: { chiefComplaint, type: typeof chiefComplaint },
-          timestamp: new Date().toISOString()
-        };
-        console.error('Invalid chief complaint:', errorResponse);
-        return new Response(JSON.stringify(errorResponse), {
+      const { previousAnswers = {} } = requestBody;
+
+      if (!chiefComplaint) {
+        return new Response(JSON.stringify({ error: 'Chief complaint is required' }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
-      
-      console.log(`Generating questions for: "${chiefComplaint}"`);
-      
-      const systemPrompt = `You are a clinical AI assistant helping to generate focused medical history questions for a patient presenting with "${chiefComplaint}".
 
-Generate 4-6 relevant questions that follow the SOCRATES/OLDCARTS framework (Site, Onset, Character, Radiation, Associated symptoms, Timing, Exacerbating/Relieving factors, Severity).
+      const systemPrompt = `You are a clinical AI assistant generating focused medical history questions for a patient presenting with "${chiefComplaint}".
 
-Return ONLY a valid JSON array of question objects with this exact format:
+Generate 4-6 relevant questions following the SOCRATES/OLDCARTS framework (Site, Onset, Character, Radiation, Associated symptoms, Timing, Exacerbating/Relieving factors, Severity).
+
+Return ONLY a valid JSON array of question objects:
 [
   {
-    "id": "uuid-here",
-    "text": "Question text here?",
+    "id": "uuid-format",
+    "text": "Question text?",
     "type": "multiple-choice",
     "options": ["Option 1", "Option 2", "Option 3"],
     "category": "onset",
@@ -191,239 +122,69 @@ Return ONLY a valid JSON array of question objects with this exact format:
   }
 ]
 
-IMPORTANT:
-- Use valid UUID v4 format for each question ID
-- Make questions specific to the chief complaint "${chiefComplaint}"
-- For pain complaints, include severity scale questions (type: "scale")
-- Use appropriate time ranges for timing questions
-- Keep questions clinically relevant and focused
-- Return ONLY the JSON array, no other text`;
+Use valid UUID v4 format for each ID. Make questions specific to "${chiefComplaint}". Include severity scale questions (type: "scale") for pain. Return ONLY the JSON array.`;
 
       const userPrompt = `Chief complaint: ${chiefComplaint}
 ${Object.keys(previousAnswers).length > 0 ? `Previous answers: ${JSON.stringify(previousAnswers)}` : ''}
+Generate focused clinical questions.`;
 
-Generate focused clinical questions for this presentation.`;
+      const aiResponse = await callAI(systemPrompt, userPrompt, 2000);
+      let questions = extractJSON(aiResponse, 'array');
 
-      console.log(`Sending request to Google Gemini API...`);
-      console.log(`System prompt length: ${systemPrompt.length} characters`);
-      console.log(`User prompt length: ${userPrompt.length} characters`);
-
-      try {
-        const modelToUse = 'gemini-2.0-flash-exp';
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelToUse}:generateContent?key=${googleApiKey}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            contents: [{
-              parts: [{
-                text: `${systemPrompt}\n\n${userPrompt}`
-              }]
-            }],
-            generationConfig: {
-              maxOutputTokens: 2000,
-              temperature: 0.3
-            }
-          }),
-        });
-
-        console.log(`Gemini response status: ${response.status}`);
-        console.log(`Gemini response headers:`, Object.fromEntries(response.headers.entries()));
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('Gemini API Error Details:', {
-            status: response.status,
-            statusText: response.statusText,
-            headers: Object.fromEntries(response.headers.entries()),
-            body: errorText
-          });
-          
-          logError('GEMINI_API', { status: response.status, statusText: response.statusText }, { 
-            errorText,
-            model: modelToUse,
-            hasApiKey: !!googleApiKey,
-            keyLength: googleApiKey?.length
-          });
-          
-          const errorResponse = {
-            error: `Gemini API error: ${response.status} - ${response.statusText}`,
-            details: errorText,
-            timestamp: new Date().toISOString(),
-            apiKeyConfigured: !!googleApiKey,
-            modelUsed: modelToUse,
-            troubleshooting: {
-              possibleCauses: [
-                'API key invalid or expired',
-                'Gemini API quota exceeded',
-                'Model not available or rate limited',
-                'Request payload too large'
-              ],
-              nextSteps: [
-                'Verify API key in Google AI Studio',
-                'Check API quota and billing',
-                'Try again in a few minutes if rate limited'
-              ]
-            }
-          };
-          
-          return new Response(JSON.stringify(errorResponse), {
-            status: 502,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
+      // Validate and fix question IDs
+      questions = questions.map((q: any, i: number) => {
+        if (!q.id || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(q.id)) {
+          q.id = generateUUID();
         }
+        if (!q.type) q.type = 'text';
+        if (!q.category) q.category = 'general';
+        if (typeof q.required !== 'boolean') q.required = true;
+        return q;
+      });
 
-        const data = await response.json();
-        console.log('Gemini response data:', JSON.stringify(data, null, 2));
-        
-        if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
-          throw new Error('Invalid response structure from Gemini API');
-        }
-
-        const aiResponse = data.candidates[0].content.parts[0].text;
-        console.log('AI response content:', aiResponse);
-        
-        // Extract JSON from the response
-        const jsonMatch = aiResponse.match(/\[[\s\S]*\]/);
-        if (!jsonMatch) {
-          logError('JSON_EXTRACTION', new Error('No JSON array found'), { aiResponse });
-          throw new Error('Invalid AI response format - no JSON array found');
-        }
-
-        let questions;
-        try {
-          questions = JSON.parse(jsonMatch[0]);
-        } catch (parseError) {
-          logError('AI_RESPONSE_PARSE', parseError, { jsonString: jsonMatch[0] });
-          throw new Error('Failed to parse AI response JSON');
-        }
-
-        // Validate and fix question IDs
-        questions = questions.map((q: any, index: number) => {
-          if (!q.id || typeof q.id !== 'string' || !q.id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i)) {
-            q.id = generateUUID();
-            console.log(`Generated new UUID for question ${index}: ${q.id}`);
-          }
-          return q;
-        });
-
-        console.log(`Successfully generated ${questions.length} questions for: ${chiefComplaint}`);
-        console.log('Questions with IDs:', questions.map(q => ({ id: q.id, text: q.text.substring(0, 50) + '...' })));
-
-        return new Response(JSON.stringify({ questions }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-
-      } catch (fetchError) {
-        logError('QUESTION_GENERATION', fetchError, { chiefComplaint, action });
-        
-        const errorResponse = {
-          error: 'Failed to generate questions',
-          details: fetchError.message,
-          timestamp: new Date().toISOString(),
-          chiefComplaint,
-          apiKeyConfigured: !!googleApiKey,
-          troubleshooting: {
-            likelyCause: 'Network connectivity or Gemini API issue',
-            nextSteps: [
-              'Check internet connectivity',
-              'Verify Gemini API status',
-              'Try again in a few moments'
-            ]
-          }
-        };
-        
-        return new Response(JSON.stringify(errorResponse), {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
+      console.log(`[ai-assistant] Generated ${questions.length} questions`);
+      return new Response(JSON.stringify({ questions }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     if (action === 'generate-differential') {
-      const { answers, rosData = {} }: GenerateDifferentialRequest = requestBody;
-
-      console.log(`Generating differential diagnosis for: "${chiefComplaint}"`);
+      const { answers = {}, rosData = {} } = requestBody;
 
       const systemPrompt = `You are a clinical AI assistant generating differential diagnoses. Analyze the patient presentation and provide the most likely diagnoses with clinical reasoning.
 
-Return ONLY a valid JSON array of differential diagnoses with this exact format:
+Return ONLY a valid JSON array:
 [
   {
     "condition": "Condition name",
     "probability": 85,
-    "explanation": "Clinical reasoning for this diagnosis",
-    "keyFeatures": ["Feature 1", "Feature 2", "Feature 3"]
+    "explanation": "Clinical reasoning",
+    "keyFeatures": ["Feature 1", "Feature 2"]
   }
 ]
 
-Provide 3-5 differential diagnoses ranked by likelihood (probability 1-100). Include both common and serious conditions that must be ruled out. Base probabilities on clinical evidence and epidemiology.
-Return ONLY the JSON array, no other text.`;
+Provide 3-5 differentials ranked by likelihood (probability 1-100). Include common and serious conditions. Return ONLY the JSON array.`;
 
       const userPrompt = `Chief complaint: ${chiefComplaint}
+Patient answers: ${JSON.stringify(answers, null, 2)}
+Review of Systems: ${JSON.stringify(rosData, null, 2)}
+Generate differential diagnoses.`;
 
-Patient answers to history questions:
-${JSON.stringify(answers, null, 2)}
+      const aiResponse = await callAI(systemPrompt, userPrompt, 3000);
+      const differentials = extractJSON(aiResponse, 'array');
 
-Review of Systems findings:
-${JSON.stringify(rosData, null, 2)}
-
-Generate differential diagnoses with clinical reasoning.`;
-
-      console.log('Sending differential diagnosis request to Gemini...');
-
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${googleApiKey}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: `${systemPrompt}\n\n${userPrompt}`
-            }]
-          }],
-          generationConfig: {
-            maxOutputTokens: 3000,
-            temperature: 0.2
-          }
-        }),
-      });
-
-      console.log('Differential diagnosis response status:', response.status);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Gemini API error for differential:', response.status, errorText);
-        throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
-      }
-
-      const data = await response.json();
-      const aiResponse = data.candidates[0].content.parts[0].text;
-      
-      // Extract JSON from the response
-      const jsonMatch = aiResponse.match(/\[[\s\S]*\]/);
-      if (!jsonMatch) {
-        throw new Error('Invalid AI response format for differential diagnosis');
-      }
-
-      const differentials = JSON.parse(jsonMatch[0]);
-      console.log(`Generated ${differentials.length} differential diagnoses for: ${chiefComplaint}`);
-
+      console.log(`[ai-assistant] Generated ${differentials.length} differentials`);
       return new Response(JSON.stringify({ differentials }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     if (action === 'generate-clinical-support') {
-      const { differentialDiagnoses, answers, rosData = {} } = requestBody;
+      const { differentialDiagnoses = [], answers = {}, rosData = {} } = requestBody;
 
-      console.log(`Generating clinical decision support for: "${chiefComplaint}"`);
+      const systemPrompt = `You are a clinical AI assistant providing investigation recommendations and clinical decision support.
 
-      const systemPrompt = `You are a clinical AI assistant providing investigation recommendations and clinical decision support. Analyze the patient presentation and provide structured clinical guidance.
-
-Return ONLY a valid JSON object with this exact format:
+Return ONLY a valid JSON object:
 {
   "investigations": [
     {
@@ -446,105 +207,51 @@ Return ONLY a valid JSON object with this exact format:
     {
       "condition": "Condition name",
       "severity": "high",
-      "description": "Description of the red flag",
-      "immediateActions": ["action1", "action2"]
+      "description": "Red flag description",
+      "immediateActions": ["action1"]
     }
   ],
   "guidelines": [
     {
       "title": "Guideline title",
-      "source": "Guideline source",
-      "recommendation": "Specific recommendation",
+      "source": "Source",
+      "recommendation": "Recommendation",
       "evidenceLevel": "A",
       "applicableConditions": ["condition1"]
     }
   ],
-  "treatmentRecommendations": ["treatment1", "treatment2"],
-  "followUpRecommendations": ["followup1", "followup2"]
+  "treatmentRecommendations": ["treatment1"],
+  "followUpRecommendations": ["followup1"]
 }
 
-Provide evidence-based recommendations prioritized by clinical importance and cost-effectiveness.
-Return ONLY the JSON object, no other text.`;
+Provide evidence-based recommendations. Return ONLY the JSON object.`;
 
       const userPrompt = `Chief complaint: ${chiefComplaint}
+Differential diagnoses: ${JSON.stringify(differentialDiagnoses, null, 2)}
+Patient answers: ${JSON.stringify(answers, null, 2)}
+Review of Systems: ${JSON.stringify(rosData, null, 2)}
+Generate clinical decision support.`;
 
-Differential diagnoses:
-${JSON.stringify(differentialDiagnoses, null, 2)}
+      const aiResponse = await callAI(systemPrompt, userPrompt, 4000);
+      const clinicalSupport = extractJSON(aiResponse, 'object');
 
-Patient answers to history questions:
-${JSON.stringify(answers, null, 2)}
-
-Review of Systems findings:
-${JSON.stringify(rosData, null, 2)}
-
-Generate comprehensive clinical decision support.`;
-
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${googleApiKey}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: `${systemPrompt}\n\n${userPrompt}`
-            }]
-          }],
-          generationConfig: {
-            maxOutputTokens: 4000,
-            temperature: 0.2
-          }
-        }),
-      });
-
-      console.log(`Clinical support response status: ${response.status}`);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Gemini API error for clinical support:', response.status, errorText);
-        throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
-      }
-
-      const data = await response.json();
-      const aiResponse = data.candidates[0].content.parts[0].text;
-      
-      // Extract JSON from the response
-      const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error('Invalid AI response format for clinical support');
-      }
-
-      const clinicalSupport = JSON.parse(jsonMatch[0]);
-      console.log(`Generated clinical decision support for: ${chiefComplaint}`);
-
+      console.log(`[ai-assistant] Generated clinical support`);
       return new Response(JSON.stringify({ clinicalSupport }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    console.error('Invalid action parameter:', action);
-    return new Response(JSON.stringify({ 
-      error: 'Invalid action parameter',
-      received: action,
-      availableActions: ['generate-questions', 'generate-differential', 'generate-clinical-support', 'health-check', 'test'],
-      timestamp: new Date().toISOString()
-    }), {
+    return new Response(JSON.stringify({ error: 'Invalid action', received: action }), {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
-    logError('FUNCTION_ERROR', error, { url: req.url, method: req.method });
-    
-    const errorResponse = { 
-      error: 'Internal server error',
-      message: error.message,
+    console.error('[ai-assistant] Error:', error.message);
+    return new Response(JSON.stringify({
+      error: error.message || 'Internal server error',
       timestamp: new Date().toISOString(),
-      function: 'ai-assistant',
-      version: '2.0.0'
-    };
-    
-    return new Response(JSON.stringify(errorResponse), {
+    }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
