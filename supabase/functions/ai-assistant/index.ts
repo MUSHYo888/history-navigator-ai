@@ -179,6 +179,59 @@ Generate differential diagnoses.`;
       });
     }
 
+    if (action === 'generate-adaptive-questions') {
+      const { phase1Answers = '', redFlags = '', triggers = '', riskLevel = 'medium', maxQuestions = 5 } = requestBody;
+
+      if (!chiefComplaint) {
+        return new Response(JSON.stringify({ error: 'Chief complaint is required' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const systemPrompt = `You are a clinical AI assistant generating targeted follow-up questions for Phase 2 of a medical assessment. The patient presented with "${chiefComplaint}" and their risk level is "${riskLevel}".
+
+Based on the Phase 1 answers and identified concerns, generate ${maxQuestions} focused follow-up questions that address gaps, red flags, and clinical concerns.
+
+Return ONLY a valid JSON array of question objects:
+[
+  {
+    "text": "Follow-up question text?",
+    "type": "multiple-choice-with-text",
+    "options": ["Option 1", "Option 2", "Option 3"],
+    "category": "symptom_clarification",
+    "required": true,
+    "priority": 1,
+    "redFlag": false,
+    "rationale": "Why this question matters clinically",
+    "trigger": "What finding triggered this question"
+  }
+]
+
+Categories: symptom_clarification, red_flag_screening, pain_management, medical_history, emergency_screening, additional_concerns.
+Return ONLY the JSON array.`;
+
+      const userPrompt = `Chief complaint: ${chiefComplaint}
+Risk level: ${riskLevel}
+Phase 1 answers:
+${phase1Answers}
+Red flags identified:
+${redFlags}
+Phase 2 triggers:
+${triggers}
+Generate targeted follow-up questions.`;
+
+      const aiResponse = await callAI(systemPrompt, userPrompt, 2000);
+      let questions = extractJSON(aiResponse, 'array');
+
+      questions = questions.slice(0, maxQuestions);
+
+      console.log(`[ai-assistant] Generated ${questions.length} adaptive questions`);
+      return new Response(JSON.stringify({ questions }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     if (action === 'generate-clinical-support') {
       const { differentialDiagnoses = [], answers = {}, rosData = {} } = requestBody;
 
