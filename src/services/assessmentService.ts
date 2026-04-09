@@ -63,7 +63,6 @@ export class AssessmentService {
   }
 
   static async saveQuestions(assessmentId: string, questions: Question[]): Promise<void> {
-    console.log(`AssessmentService: Saving ${questions.length} questions for assessment ${assessmentId}`);
     
     if (!isValidUUID(assessmentId)) {
       throw new Error(`Invalid assessment ID format: ${assessmentId}`);
@@ -95,11 +94,9 @@ export class AssessmentService {
       throw new Error(`Failed to save questions: ${error.message}`);
     }
     
-    console.log(`AssessmentService: Successfully saved ${questions.length} questions`);
   }
 
   static async saveAnswer(assessmentId: string, questionId: string, answer: Answer): Promise<void> {
-    console.log(`AssessmentService: Saving answer for question ${questionId} in assessment ${assessmentId}`);
     
     // Validate UUIDs
     if (!isValidUUID(assessmentId)) {
@@ -115,7 +112,6 @@ export class AssessmentService {
       throw new Error('Answer value is required');
     }
 
-    console.log('Answer data being saved:', {
       assessment_id: assessmentId,
       question_id: questionId,
       answer_value: answer.value,
@@ -136,7 +132,6 @@ export class AssessmentService {
       throw new Error(`Failed to save answer: ${error.message}`);
     }
     
-    console.log(`AssessmentService: Successfully saved answer for question ${questionId}`);
   }
 
   static async saveReviewOfSystems(assessmentId: string, systemName: string, rosData: { positive: string[]; negative: string[]; notes?: string }): Promise<void> {

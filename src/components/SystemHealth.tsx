@@ -50,7 +50,6 @@ export function SystemHealth({ onAIServiceFixed }: SystemHealthProps) {
 
     // Check database connectivity
     try {
-      console.log('SystemHealth: Checking database connectivity...');
       const startTime = Date.now();
       const { error, count } = await supabase
         .from('patients')
@@ -85,7 +84,6 @@ export function SystemHealth({ onAIServiceFixed }: SystemHealthProps) {
 
     // Check edge function
     try {
-      console.log('SystemHealth: Checking edge function...');
       const startTime = Date.now();
       const { data, error } = await supabase.functions.invoke('ai-assistant', {
         body: { action: 'test' }
@@ -153,7 +151,6 @@ export function SystemHealth({ onAIServiceFixed }: SystemHealthProps) {
 
     // Test AI service with actual question generation
     try {
-      console.log('SystemHealth: Testing AI service with real question generation...');
       const startTime = Date.now();
       const testQuestions = await AIService.generateQuestions('test headache for system health check');
       const responseTime = Date.now() - startTime;

@@ -15,7 +15,6 @@ export class ClinicalSupportService {
   ): Promise<any> {
     try {
       const result = await withRetry(async () => {
-        console.log('ClinicalSupportService: Generating clinical decision support for:', chiefComplaint);
         
         const { data, error } = await supabase.functions.invoke('ai-assistant', {
           body: {
@@ -30,7 +29,6 @@ export class ClinicalSupportService {
         if (error) throw error;
         if (!data?.clinicalSupport) throw new Error('Invalid response from AI service');
 
-        console.log('ClinicalSupportService: Successfully generated clinical decision support');
         return data.clinicalSupport;
       }, 3, 1000);
 

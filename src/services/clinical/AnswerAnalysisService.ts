@@ -31,7 +31,6 @@ export class AnswerAnalysisService {
     answers: Record<string, Answer>, 
     chiefComplaint: string
   ): AnswerAnalysis {
-    console.log('AnswerAnalysisService: Analyzing Phase 1 answers for clinical significance');
     
     const redFlags: RedFlagAlert[] = [];
     const concerningPatterns: string[] = [];
@@ -53,7 +52,6 @@ export class AnswerAnalysisService {
     // Generate follow-up recommendations
     this.generateFollowUpRecommendations(riskLevel, redFlags, recommendedFollowUp);
 
-    console.log(`Analysis complete: ${redFlags.length} red flags, risk level: ${riskLevel}`);
     
     return {
       redFlags,

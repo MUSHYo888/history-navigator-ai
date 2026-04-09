@@ -14,11 +14,9 @@ export async function withRetry<T>(
       return await fn();
     } catch (error) {
       lastError = error;
-      console.warn(`withRetry: Attempt ${attempt + 1}/${maxRetries} failed:`, error?.message || error);
 
       if (attempt < maxRetries - 1) {
         const waitTime = Math.pow(2, attempt) * backoffMs;
-        console.log(`withRetry: Waiting ${waitTime}ms before retry...`);
         await new Promise(resolve => setTimeout(resolve, waitTime));
       }
     }

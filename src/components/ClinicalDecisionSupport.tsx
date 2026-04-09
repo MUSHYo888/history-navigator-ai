@@ -1,7 +1,7 @@
 // ABOUTME: Unified clinical decision support component integrating investigations and treatment planning
 // ABOUTME: Provides seamless workflow between diagnostic testing and therapeutic decisions
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -83,7 +83,6 @@ export function ClinicalDecisionSupport({
   const { state } = useMedical();
   const saveClinicalPlanMutation = useSaveClinicalDecisionSupport();
   
-  const emptyDiagnoses = useMemo(() => [], []);
   const {
     recommendations,
     redFlags,
@@ -92,7 +91,7 @@ export function ClinicalDecisionSupport({
     error: aiError
   } = useInvestigationRecommendations(
     chiefComplaint, 
-    emptyDiagnoses,
+    [], // Will be populated with differential diagnoses
     state.answers, 
     state.rosData
   );
@@ -131,10 +130,6 @@ export function ClinicalDecisionSupport({
   }, [selectedInvestigations, selectedMedications, selectedNonPharm, clinicalNotes, investigationRationale, followUpPlan]);
 
   const loadClinicalData = async () => {
-    if (recommendations.length === 0) {
-      setLoading(false);
-      return;
-    }
     try {
       setLoading(true);
 
@@ -473,7 +468,6 @@ export function ClinicalDecisionSupport({
                 chiefComplaint={chiefComplaint}
                 assessmentId={state.currentAssessment?.id}
                 onDiagnosisGenerated={(diagnoses) => {
-                  console.log('Generated diagnoses:', diagnoses);
                   toast.success(`Generated ${diagnoses.length} differential diagnoses`);
                 }}
               />

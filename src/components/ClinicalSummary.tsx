@@ -52,7 +52,6 @@ export function ClinicalSummary({ chiefComplaint, onComplete, onBack }: Clinical
       setLoading(true);
       setError(null);
       
-      console.log('Generating differential diagnosis with data:', {
         chiefComplaint,
         answers: state.answers,
         rosData: state.rosData
@@ -75,7 +74,6 @@ export function ClinicalSummary({ chiefComplaint, onComplete, onBack }: Clinical
 
   const generateAdvancedSupport = async () => {
     try {
-      console.log('Generating advanced clinical decision support');
       
       const support = await AIService.generateAdvancedClinicalSupport(
         chiefComplaint,

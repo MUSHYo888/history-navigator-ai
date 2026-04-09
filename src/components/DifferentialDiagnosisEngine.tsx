@@ -13,7 +13,6 @@ import {
   TrendingUp, 
   AlertTriangle, 
   CheckCircle, 
-  Stethoscope,
   FileText,
   Target,
   Clock,
@@ -89,7 +88,6 @@ export function DifferentialDiagnosisEngine({
       setError(null);
       setHasAttempted(true);
       
-      console.log('Generating differential diagnosis with AI...');
 
       // Create timeout promise (30 seconds)
       const timeoutPromise = new Promise((_, reject) => 

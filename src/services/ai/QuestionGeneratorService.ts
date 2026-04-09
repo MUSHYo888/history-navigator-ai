@@ -26,7 +26,6 @@ export class QuestionGeneratorService {
   ): Promise<Question[]> {
     try {
       const result = await withRetry(async () => {
-        console.log(`QuestionGeneratorService: Generating questions for: "${chiefComplaint}"`);
         
         const { data, error } = await supabase.functions.invoke('ai-assistant', {
           body: {
@@ -51,7 +50,6 @@ export class QuestionGeneratorService {
           return question;
         });
 
-        console.log(`QuestionGeneratorService: Successfully generated ${validatedQuestions.length} AI questions`);
         return validatedQuestions;
       }, 3, 1000);
 

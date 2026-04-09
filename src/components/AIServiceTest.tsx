@@ -32,13 +32,11 @@ export function AIServiceTest() {
 
   const addTestResult = (result: TestResult) => {
     setTestResults(prev => [...prev, result]);
-    console.log(`Test Result: ${result.name}`, result);
   };
 
   const runTest = async (testName: string, testFn: () => Promise<any>): Promise<any> => {
     const startTime = Date.now();
     try {
-      console.log(`Starting test: ${testName}`);
       const result = await testFn();
       const duration = Date.now() - startTime;
       
@@ -80,7 +78,6 @@ export function AIServiceTest() {
     try {
       // Test 1: Basic Edge Function Health Check
       await runTest('Edge Function Health Check', async () => {
-        console.log('Testing edge function health...');
         const { data, error } = await supabase.functions.invoke('ai-assistant', {
           body: { action: 'health-check' }
         });
@@ -90,7 +87,6 @@ export function AIServiceTest() {
           throw new Error(`Health check failed: ${error.message}`);
         }
         
-        console.log('Health check response:', data);
         setDetailedLogs(prev => prev + `Health Check Response: ${JSON.stringify(data, null, 2)}\n\n`);
         
         return {
@@ -104,7 +100,6 @@ export function AIServiceTest() {
 
       // Test 2: Test Endpoint
       await runTest('Test Endpoint', async () => {
-        console.log('Testing test endpoint...');
         const { data, error } = await supabase.functions.invoke('ai-assistant', {
           body: { action: 'test' }
         });
@@ -114,7 +109,6 @@ export function AIServiceTest() {
           throw new Error(`Test endpoint failed: ${error.message}`);
         }
         
-        console.log('Test endpoint response:', data);
         setDetailedLogs(prev => prev + `Test Endpoint Response: ${JSON.stringify(data, null, 2)}\n\n`);
         
         return data;
@@ -122,7 +116,6 @@ export function AIServiceTest() {
 
       // Test 3: Direct Question Generation with Enhanced Error Capture
       await runTest('Direct Question Generation', async () => {
-        console.log('Testing direct question generation...');
         const { data, error } = await supabase.functions.invoke('ai-assistant', {
           body: {
             action: 'generate-questions',
@@ -155,7 +148,6 @@ export function AIServiceTest() {
           throw new Error('No questions returned from AI service');
         }
         
-        console.log('Generated questions:', data.questions);
         setDetailedLogs(prev => prev + `Generated Questions: ${JSON.stringify(data.questions, null, 2)}\n\n`);
         
         // Validate question structure
@@ -168,7 +160,6 @@ export function AIServiceTest() {
         );
         
         if (invalidQuestions.length > 0) {
-          console.warn('Invalid questions found:', invalidQuestions);
           setDetailedLogs(prev => prev + `Invalid Questions: ${JSON.stringify(invalidQuestions, null, 2)}\n\n`);
         }
         
@@ -186,14 +177,12 @@ export function AIServiceTest() {
 
       // Test 4: AI Service Wrapper
       await runTest('AI Service Wrapper', async () => {
-        console.log('Testing AI service wrapper...');
         const questions = await AIService.generateQuestions(chiefComplaint);
         
         if (!questions || questions.length === 0) {
           throw new Error('AI Service returned no questions');
         }
         
-        console.log('AI Service questions:', questions);
         setDetailedLogs(prev => prev + `AI Service Questions: ${JSON.stringify(questions, null, 2)}\n\n`);
         
         return {

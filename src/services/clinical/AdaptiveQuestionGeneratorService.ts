@@ -12,7 +12,6 @@ export class AdaptiveQuestionGeneratorService {
     phase1Answers: Record<string, Answer>,
     answerAnalysis: AnswerAnalysis
   ): Promise<Question[]> {
-    console.log('AdaptiveQuestionGeneratorService: Generating Phase 2 questions');
     
     try {
       // First, try AI-powered generation
@@ -21,7 +20,6 @@ export class AdaptiveQuestionGeneratorService {
         return aiQuestions;
       }
     } catch (error) {
-      console.warn('AI question generation failed, using rule-based fallback:', error);
     }
     
     // Fallback to rule-based generation
@@ -86,7 +84,6 @@ export class AdaptiveQuestionGeneratorService {
     phase1Answers: Record<string, Answer>,
     answerAnalysis: AnswerAnalysis
   ): Question[] {
-    console.log('Using rule-based Phase 2 question generation');
     
     const questions: Question[] = [];
     

@@ -15,7 +15,6 @@ export class DifferentialDiagnosisService {
   ): Promise<DifferentialDiagnosis[]> {
     try {
       const result = await withRetry(async () => {
-        console.log('DifferentialDiagnosisService: Generating differential diagnosis for:', chiefComplaint);
         
         const { data, error } = await supabase.functions.invoke('ai-assistant', {
           body: {
@@ -29,7 +28,6 @@ export class DifferentialDiagnosisService {
         if (error) throw error;
         if (!data?.differentials) throw new Error('Invalid response from AI service');
 
-        console.log(`DifferentialDiagnosisService: AI generated ${data.differentials.length} differential diagnoses`);
         return data.differentials;
       }, 3, 1000);
 

@@ -21,7 +21,6 @@ export class EnhancedQuestionGeneratorService {
    * Generate Phase 1 questions using clinical templates
    */
   static generatePhase1Questions(chiefComplaint: string): Question[] {
-    console.log('EnhancedQuestionGeneratorService: Generating Phase 1 questions');
     return ClinicalQuestionTemplateService.generatePhase1Questions(chiefComplaint);
   }
 
@@ -32,7 +31,6 @@ export class EnhancedQuestionGeneratorService {
     chiefComplaint: string,
     phase1Answers: Record<string, Answer>
   ): PhaseTransitionData {
-    console.log('EnhancedQuestionGeneratorService: Analyzing Phase 1 completion');
     
     // Analyze answers for clinical significance
     const answerAnalysis = AnswerAnalysisService.analyzePhase1Answers(
@@ -43,7 +41,6 @@ export class EnhancedQuestionGeneratorService {
     // Determine if Phase 2 is needed based on analysis
     const phase2Triggered = this.shouldTriggerPhase2(answerAnalysis, phase1Answers);
     
-    console.log(`Phase 1 analysis complete. Phase 2 triggered: ${phase2Triggered}, Risk: ${answerAnalysis.riskLevel}`);
     
     return {
       phase1Complete: true,
@@ -61,7 +58,6 @@ export class EnhancedQuestionGeneratorService {
     phase1Answers: Record<string, Answer>,
     answerAnalysis: AnswerAnalysis
   ): Promise<Question[]> {
-    console.log('EnhancedQuestionGeneratorService: Generating Phase 2 questions');
     
     return await AdaptiveQuestionGeneratorService.generatePhase2Questions(
       chiefComplaint,
@@ -80,7 +76,6 @@ export class EnhancedQuestionGeneratorService {
     analysis?: AnswerAnalysis
   ): Promise<void> {
     try {
-      console.log(`Saving phase ${phase} completion for assessment: ${assessmentId}`);
       
       const phaseData = {
         assessment_id: assessmentId,
@@ -103,7 +98,6 @@ export class EnhancedQuestionGeneratorService {
         throw new Error(`Failed to save phase completion: ${error.message}`);
       }
 
-      console.log(`Phase ${phase} completion saved successfully`);
     } catch (error) {
       console.error('Failed to save phase completion:', error);
       throw error;

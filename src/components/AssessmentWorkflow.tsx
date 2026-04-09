@@ -18,7 +18,7 @@ import { ErrorBoundary } from './ErrorBoundary';
 import { useStepManager } from './StepManager';
 import { useSaveQuestions, useSaveAnswer } from '@/hooks/useAssessment';
 import { toast } from 'sonner';
-import { AlertTriangle, CheckCircle, RefreshCw } from 'lucide-react';
+import { AlertTriangle, RefreshCw } from 'lucide-react';
 
 interface AssessmentWorkflowProps {
   chiefComplaint: string;
@@ -70,7 +70,6 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
   ];
 
   useEffect(() => {
-    console.log('AssessmentWorkflow mounted for chief complaint:', chiefComplaint);
     loadPhase1Questions();
   }, [chiefComplaint]);
 
@@ -78,21 +77,17 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
     try {
       setLoading(true);
       setError(null);
-      console.log(`Loading Phase 1 questions for: ${chiefComplaint}`);
       
       // Generate Phase 1 questions using clinical templates
       const questions = EnhancedQuestionGeneratorService.generatePhase1Questions(chiefComplaint);
-      console.log(`Generated ${questions.length} Phase 1 clinical questions`);
       
       // Save Phase 1 questions to database BEFORE setting local state
       if (state.currentAssessment && questions.length > 0) {
-        console.log(`Saving ${questions.length} Phase 1 questions to database`);
         try {
           await saveQuestionsMutation.mutateAsync({
             assessmentId: state.currentAssessment.id,
             questions: questions
           });
-          console.log('Phase 1 questions saved successfully');
           
           // Only set local state after successful database save
           setPhase1Questions(questions);
@@ -128,7 +123,6 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
   };
 
   const handleAnswerSubmit = async (questionId: string, answer: any) => {
-    console.log(`Submitting answer for question ${questionId} in Phase ${currentPhase}:`, answer);
     
     if (!state.currentAssessment) {
       console.error('No current assessment found');
@@ -166,7 +160,6 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
         answer: answerObj
       });
       
-      console.log('Answer saved successfully');
       toast.success('Answer saved');
 
       // Handle question progression
@@ -191,7 +184,6 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
       setCurrentPhase1Index(prev => prev + 1);
     } else {
       // Phase 1 complete - analyze answers and determine if Phase 2 is needed
-      console.log('Phase 1 complete, analyzing answers...');
       
       try {
         const transitionData = EnhancedQuestionGeneratorService.analyzePhase1Completion(
@@ -214,7 +206,6 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
         
         if (transitionData.phase2Triggered && transitionData.answerAnalysis) {
           // Generate Phase 2 questions
-          console.log('Phase 2 triggered, generating adaptive questions...');
           setLoading(true);
           
           try {
@@ -247,7 +238,6 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
             setLoading(false);
           }
         } else {
-          console.log('Phase 2 not triggered, proceeding to Review of Systems');
           proceedToROS();
         }
         
@@ -265,7 +255,6 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
       setCurrentPhase2Index(prev => prev + 1);
     } else {
       // Phase 2 complete
-      console.log('Phase 2 complete, proceeding to Review of Systems');
       setPhase2Complete(true);
       
       // Save Phase 2 completion
@@ -287,7 +276,6 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
   };
 
   const handleROSComplete = async () => {
-    console.log('ROS completed, moving to PMH');
     
     try {
       setStepTransitionLoading(true);
@@ -306,7 +294,6 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
   };
 
   const handlePMHComplete = async (pmhData: any) => {
-    console.log('PMH completed, saving data');
     
     try {
       setStepTransitionLoading(true);
@@ -330,7 +317,6 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
   };
 
   const handlePEComplete = async (peData: any) => {
-    console.log('PE completed, saving data:', peData);
     
     try {
       setStepTransitionLoading(true);
@@ -341,7 +327,6 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
         payload: peData
       });
       
-      console.log('PE data saved to context, proceeding to Clinical Decision Support');
       
       // Update UI state
       setShowPE(false);
@@ -350,7 +335,6 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
       // Update step in database
       await updateStep(5);
       
-      console.log('Successfully transitioned to Clinical Decision Support');
       toast.success('Physical examination completed');
       
     } catch (error) {
@@ -367,7 +351,6 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
   };
 
   const handleClinicalDecisionSupportComplete = async (clinicalPlan: any) => {
-    console.log('Clinical Decision Support completed, saving plan');
     // Store clinical plan in context or database
     
     setShowClinicalDecisionSupport(false);
@@ -376,7 +359,6 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
   };
 
   const handleSummaryComplete = () => {
-    console.log('Assessment workflow completed');
     onComplete();
   };
 

@@ -187,7 +187,6 @@ export function ReviewOfSystemsComponent({ onComplete, onBack }: ReviewOfSystems
           })
         );
         await Promise.all(savePromises);
-        console.log('ROS data saved to database');
       } catch (error) {
         console.error('Failed to save ROS data:', error);
       }

@@ -33,7 +33,6 @@ export function useInvestigationRecommendations(
       setLoading(true);
       setError(null);
       
-      console.log('Fetching investigation recommendations for:', chiefComplaint);
       
       // Try AI service first
       try {
@@ -48,9 +47,7 @@ export function useInvestigationRecommendations(
         setRedFlags(clinicalSupport.redFlags || []);
         setGuidelines(clinicalSupport.guidelines || []);
         
-        console.log('AI recommendations loaded successfully');
       } catch (aiError) {
-        console.warn('AI service failed, using enhanced protocol-based recommendations:', aiError);
         
         // Fallback to enhanced investigation service
         const protocolRecommendations = EnhancedInvestigationService.generateSmartRecommendations(
@@ -78,15 +75,11 @@ export function useInvestigationRecommendations(
     }
   };
 
-  const serializedDiagnoses = JSON.stringify(differentialDiagnoses);
-  const serializedAnswers = JSON.stringify(answers);
-  const serializedRos = JSON.stringify(rosData);
-
   useEffect(() => {
     if (chiefComplaint) {
       fetchRecommendations();
     }
-  }, [chiefComplaint, serializedDiagnoses, serializedAnswers, serializedRos]);
+  }, [chiefComplaint, differentialDiagnoses, answers, rosData]);
 
   return {
     recommendations,

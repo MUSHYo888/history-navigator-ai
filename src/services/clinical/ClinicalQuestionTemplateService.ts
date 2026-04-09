@@ -300,7 +300,6 @@ export class ClinicalQuestionTemplateService {
   ];
 
   static generatePhase1Questions(chiefComplaint: string): Question[] {
-    console.log(`ClinicalQuestionTemplateService: Generating Phase 1 questions for: "${chiefComplaint}"`);
     
     // Find matching template
     const matchingTemplate = this.templates.find(template => 
@@ -310,18 +309,15 @@ export class ClinicalQuestionTemplateService {
     let questions: Question[];
     
     if (matchingTemplate) {
-      console.log(`Found matching template: ${matchingTemplate.framework} for "${chiefComplaint}"`);
       questions = matchingTemplate.questions.map(q => ({
         ...q,
         id: this.generateUUID(),
         phase: 1 as const
       }));
     } else {
-      console.log(`No specific template found for "${chiefComplaint}", using general questions`);
       questions = this.getGeneralPhase1Questions();
     }
 
-    console.log(`Generated ${questions.length} Phase 1 questions using clinical templates`);
     return questions;
   }
 

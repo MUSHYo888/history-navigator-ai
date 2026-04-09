@@ -12,7 +12,6 @@ import { FallbackDataService } from './fallback/FallbackDataService';
 export class AIService {
   private static logAICall(service: string, chiefComplaint: string, success: boolean, error?: any) {
     const timestamp = new Date().toISOString();
-    console.log(`[${timestamp}] AI Service Call:`, {
       service,
       chiefComplaint,
       success,
@@ -25,21 +24,17 @@ export class AIService {
     previousAnswers?: Record<string, any>
   ): Promise<Question[]> {
     try {
-      console.log(`AIService: Attempting to generate questions for: "${chiefComplaint}"`);
       
       const questions = await QuestionGeneratorService.generateQuestions(chiefComplaint, previousAnswers);
       
       this.logAICall('generateQuestions', chiefComplaint, true);
-      console.log(`AIService: Successfully generated ${questions.length} questions`);
       
       return questions;
     } catch (error) {
       this.logAICall('generateQuestions', chiefComplaint, false, error);
-      console.warn(`AIService: AI question generation failed, using fallback:`, error);
       
       // Enhanced fallback with better error messaging
       const fallbackQuestions = FallbackDataService.getFallbackQuestions(chiefComplaint);
-      console.log(`AIService: Using ${fallbackQuestions.length} fallback questions`);
       
       return fallbackQuestions;
     }
@@ -51,7 +46,6 @@ export class AIService {
     rosData?: Record<string, any>
   ): Promise<DifferentialDiagnosis[]> {
     try {
-      console.log(`AIService: Attempting to generate differential diagnosis for: "${chiefComplaint}"`);
       
       const differentials = await DifferentialDiagnosisService.generateDifferentialDiagnosis(
         chiefComplaint, 
@@ -60,15 +54,12 @@ export class AIService {
       );
       
       this.logAICall('generateDifferentialDiagnosis', chiefComplaint, true);
-      console.log(`AIService: Successfully generated ${differentials.length} differential diagnoses`);
       
       return differentials;
     } catch (error) {
       this.logAICall('generateDifferentialDiagnosis', chiefComplaint, false, error);
-      console.warn(`AIService: AI differential diagnosis failed, using fallback:`, error);
       
       const fallbackDifferentials = FallbackDataService.getFallbackDifferentials(chiefComplaint);
-      console.log(`AIService: Using ${fallbackDifferentials.length} fallback differentials`);
       
       return fallbackDifferentials;
     }
@@ -81,7 +72,6 @@ export class AIService {
     rosData?: Record<string, any>
   ): Promise<any> {
     try {
-      console.log(`AIService: Attempting to generate clinical decision support for: "${chiefComplaint}"`);
       
       const support = await ClinicalSupportService.generateClinicalDecisionSupport(
         chiefComplaint, 
@@ -91,12 +81,10 @@ export class AIService {
       );
       
       this.logAICall('generateClinicalDecisionSupport', chiefComplaint, true);
-      console.log(`AIService: Successfully generated clinical decision support`);
       
       return support;
     } catch (error) {
       this.logAICall('generateClinicalDecisionSupport', chiefComplaint, false, error);
-      console.warn(`AIService: AI clinical support failed, using fallback:`, error);
       
       return {
         investigations: FallbackDataService.getFallbackInvestigations(chiefComplaint),
@@ -116,7 +104,6 @@ export class AIService {
     demographics?: any
   ): Promise<AdvancedClinicalSupport> {
     try {
-      console.log(`AIService: Generating advanced clinical support for: ${chiefComplaint}`);
       
       const age = demographics?.age || 50;
       const vitals = vitalSigns || {

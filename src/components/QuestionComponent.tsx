@@ -37,11 +37,9 @@ export function QuestionComponent({ question, onSubmit, questionNumber, totalQue
     // More lenient validation - allow empty answers for non-required questions
     // Fix: Handle falsy values properly (0, false, etc should be valid)
     if (question.required && (finalAnswer === '' || finalAnswer === null || finalAnswer === undefined)) {
-      console.warn('Required question not answered:', question.id, finalAnswer);
       return;
     }
 
-    console.log('Submitting answer:', { questionId: question.id, finalAnswer, notes: combinedNotes });
 
     onSubmit(question.id, {
       value: finalAnswer,

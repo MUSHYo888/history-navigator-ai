@@ -127,7 +127,6 @@ const Index = () => {
 
   const handlePatientCreated = (patient: Patient) => {
     try {
-      console.log('Patient created:', patient);
       dispatch({ type: 'SET_CURRENT_PATIENT', payload: patient });
       localStorage.setItem(SESSION_KEYS.patientId, patient.id);
       setCurrentView('chief-complaint');
@@ -144,14 +143,12 @@ const Index = () => {
         throw new Error('No current patient set - please restart assessment');
       }
 
-      console.log('Creating assessment for patient:', state.currentPatient.id, 'with complaint:', complaint);
 
       const assessment = await createAssessmentMutation.mutateAsync({
         patientId: state.currentPatient.id,
         chiefComplaint: complaint
       });
       
-      console.log('Assessment created:', assessment);
       
       await updatePatientMutation.mutateAsync(state.currentPatient.id);
       
@@ -171,7 +168,6 @@ const Index = () => {
 
   const handleAssessmentComplete = () => {
     try {
-      console.log('Assessment completed successfully');
       // Clear active session
       localStorage.removeItem(SESSION_KEYS.assessmentId);
       localStorage.removeItem(SESSION_KEYS.patientId);
@@ -197,7 +193,6 @@ const Index = () => {
 
   const handleResumeAssessment = async (assessmentId: string) => {
     try {
-      console.log('Resuming assessment:', assessmentId);
       
       const { data: assessment, error } = await supabase
         .from('assessments')
