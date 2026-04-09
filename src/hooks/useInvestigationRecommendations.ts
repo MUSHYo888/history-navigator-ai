@@ -78,11 +78,15 @@ export function useInvestigationRecommendations(
     }
   };
 
+  const serializedDiagnoses = JSON.stringify(differentialDiagnoses);
+  const serializedAnswers = JSON.stringify(answers);
+  const serializedRos = JSON.stringify(rosData);
+
   useEffect(() => {
     if (chiefComplaint) {
       fetchRecommendations();
     }
-  }, [chiefComplaint, differentialDiagnoses, answers, rosData]);
+  }, [chiefComplaint, serializedDiagnoses, serializedAnswers, serializedRos]);
 
   return {
     recommendations,
