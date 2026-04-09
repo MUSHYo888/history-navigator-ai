@@ -51,11 +51,6 @@ export function ClinicalSummary({ chiefComplaint, onComplete, onBack }: Clinical
     try {
       setLoading(true);
       setError(null);
-      
-        chiefComplaint,
-        answers: state.answers,
-        rosData: state.rosData
-      });
 
       const differentialDiagnoses = await AIService.generateDifferentialDiagnosis(
         chiefComplaint,
