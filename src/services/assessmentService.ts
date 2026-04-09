@@ -112,11 +112,7 @@ export class AssessmentService {
       throw new Error('Answer value is required');
     }
 
-      assessment_id: assessmentId,
-      question_id: questionId,
-      answer_value: answer.value,
-      notes: answer.notes
-    });
+
 
     const { error } = await supabase
       .from('answers')
