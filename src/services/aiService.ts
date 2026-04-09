@@ -12,6 +12,7 @@ import { FallbackDataService } from './fallback/FallbackDataService';
 export class AIService {
   private static logAICall(service: string, chiefComplaint: string, success: boolean, error?: any) {
     const timestamp = new Date().toISOString();
+    console.log(`[AI Service] ${timestamp}`, {
       service,
       chiefComplaint,
       success,
