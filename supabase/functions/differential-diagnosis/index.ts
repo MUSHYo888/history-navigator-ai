@@ -81,16 +81,28 @@ Physical Examination: ${JSON.stringify(clinicalContext.physicalExam)}`;
     if (!response.ok) {
       const errorText = await response.text();
       console.error('[differential-diagnosis] AI error:', response.status, errorText);
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ error: 'Rate limit exceeded' }), {
-          status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+
+      // For billing/rate-limit errors, return 200 with fallback data so the frontend doesn't crash
+      if (response.status === 402 || response.status === 429) {
+        const fallbackDiagnoses = generateFallbackDifferentials(chiefComplaint);
+        const errorType = response.status === 402 ? 'AI_CREDITS_EXHAUSTED' : 'RATE_LIMITED';
+        const userMessage = response.status === 402
+          ? 'AI credits exhausted. Showing evidence-based clinical protocols.'
+          : 'AI rate limit reached. Showing evidence-based clinical protocols.';
+
+        return new Response(JSON.stringify({
+          differentialDiagnoses: fallbackDiagnoses,
+          clinicalRecommendations: generateClinicalRecommendations(fallbackDiagnoses),
+          riskStratification: calculateRiskStratification(fallbackDiagnoses),
+          _fallback: true,
+          _errorType: errorType,
+          _message: userMessage,
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: 'AI credits exhausted' }), {
-          status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
+
       throw new Error(`AI Gateway error: ${response.status}`);
     }
 
