@@ -324,7 +324,7 @@ export function DifferentialDiagnosisEngine({
                             Supporting Features
                           </h4>
                           <ul className="text-sm space-y-1">
-                            {diagnosis.keyFeatures.map((feature, i) => (
+                            {(diagnosis.keyFeatures || []).map((feature, i) => (
                               <li key={i} className="flex items-start">
                                 <span className="w-1.5 h-1.5 bg-green-500 rounded-full mt-2 mr-2 flex-shrink-0" />
                                 {feature}
@@ -351,13 +351,13 @@ export function DifferentialDiagnosisEngine({
                         )}
                       </div>
 
-                      {diagnosis.redFlags.length > 0 && (
+                      {(diagnosis.redFlags || []).length > 0 && (
                         <Alert className="mt-4 border-red-200 bg-red-50">
                           <AlertTriangle className="h-4 w-4 text-red-500" />
                           <AlertDescription>
                             <div className="font-medium text-red-700 mb-1">Red Flags Identified:</div>
                             <ul className="text-sm text-red-600">
-                              {diagnosis.redFlags.map((flag, i) => (
+                              {(diagnosis.redFlags || []).map((flag, i) => (
                                 <li key={i}>• {flag}</li>
                               ))}
                             </ul>
@@ -385,7 +385,7 @@ export function DifferentialDiagnosisEngine({
                     </CardHeader>
                     <CardContent>
                       <ul className="space-y-2">
-                        {recommendations.immediateActions.map((action, i) => (
+                        {(recommendations.immediateActions || []).map((action, i) => (
                           <li key={i} className="flex items-start">
                             <span className="w-2 h-2 bg-red-500 rounded-full mt-2 mr-3 flex-shrink-0" />
                             {action}
@@ -404,11 +404,11 @@ export function DifferentialDiagnosisEngine({
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    {recommendations.investigationPriority.map((item, i) => (
+                    {(recommendations.investigationPriority || []).map((item, i) => (
                       <div key={i} className="mb-4 last:mb-0">
                         <h4 className="font-medium mb-2">{item.condition}</h4>
                         <div className="flex flex-wrap gap-2">
-                          {item.recommendedTests.map((test, j) => (
+                          {(item.recommendedTests || []).map((test, j) => (
                             <Badge key={j} variant="secondary">{test}</Badge>
                           ))}
                         </div>
@@ -426,7 +426,7 @@ export function DifferentialDiagnosisEngine({
                   </CardHeader>
                   <CardContent>
                     <ul className="space-y-2">
-                      {recommendations.followUpRecommendations.map((rec, i) => (
+                      {(recommendations.followUpRecommendations || []).map((rec, i) => (
                         <li key={i} className="flex items-start">
                           <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 mr-3 flex-shrink-0" />
                           {rec}
@@ -486,7 +486,7 @@ export function DifferentialDiagnosisEngine({
                     <div>
                       <h4 className="font-medium mb-3">Risk-Based Recommendations:</h4>
                       <ul className="space-y-2">
-                        {riskStratification.recommendations.map((rec, i) => (
+                        {(riskStratification.recommendations || []).map((rec, i) => (
                           <li key={i} className="flex items-start">
                             <span className="w-2 h-2 bg-primary rounded-full mt-2 mr-3 flex-shrink-0" />
                             {rec}

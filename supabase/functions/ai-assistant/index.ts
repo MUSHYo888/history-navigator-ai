@@ -44,11 +44,12 @@ async function callAI(systemPrompt: string, userPrompt: string, maxTokens = 2000
   if (!response.ok) {
     const errorText = await response.text();
     console.error('AI Gateway error:', response.status, errorText);
-    if (response.status === 429) {
-      throw new Error('Rate limit exceeded. Please try again later.');
-    }
-    if (response.status === 402) {
-      throw new Error('AI credits exhausted. Please add funds in Settings > Workspace > Usage.');
+    if (response.status === 429 || response.status === 402) {
+      const errorType = response.status === 402 ? 'AI_CREDITS_EXHAUSTED' : 'RATE_LIMITED';
+      const message = response.status === 402
+        ? 'AI credits exhausted. Using evidence-based clinical protocols.'
+        : 'Rate limit reached. Please try again later.';
+      throw { billingError: true, errorType, message };
     }
     throw new Error(`AI Gateway error: ${response.status}`);
   }
@@ -300,6 +301,45 @@ Generate clinical decision support.`;
     });
 
   } catch (error) {
+    // Handle billing/rate-limit errors gracefully — return 200 with fallback signal
+    if (error?.billingError) {
+      console.error(`[ai-assistant] ${error.errorType}:`, error.message);
+      
+      // Parse original request to provide action-specific fallback
+      let fallbackPayload: any = {
+        _fallback: true,
+        _errorType: error.errorType,
+        _message: error.message,
+      };
+
+      // Try to parse request body for action-specific fallback
+      try {
+        const bodyText = await req.clone().text();
+        const body = JSON.parse(bodyText);
+        
+        if (body.action === 'generate-questions') {
+          fallbackPayload.questions = [];
+        } else if (body.action === 'generate-differential') {
+          fallbackPayload.differentials = [];
+        } else if (body.action === 'generate-clinical-support') {
+          fallbackPayload.clinicalSupport = {
+            investigations: [],
+            redFlags: [],
+            guidelines: [],
+            treatmentRecommendations: [],
+            followUpRecommendations: [],
+          };
+        } else if (body.action === 'generate-adaptive-questions') {
+          fallbackPayload.questions = [];
+        }
+      } catch { /* ignore parse errors */ }
+
+      return new Response(JSON.stringify(fallbackPayload), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     console.error('[ai-assistant] Error:', error.message);
     return new Response(JSON.stringify({
       error: error.message || 'Internal server error',
