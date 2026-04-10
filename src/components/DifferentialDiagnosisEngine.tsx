@@ -126,7 +126,11 @@ export function DifferentialDiagnosisEngine({
         onDiagnosisGenerated(data.differentialDiagnoses || []);
       }
 
-      toast.success(`Generated ${data.differentialDiagnoses?.length || 0} differential diagnoses`);
+      if (data._fallback) {
+        toast.warning(data._message || 'Using evidence-based clinical protocols.');
+      } else {
+        toast.success(`Generated ${data.differentialDiagnoses?.length || 0} differential diagnoses`);
+      }
 
     } catch (err) {
       console.error('Error generating differential diagnosis:', err);
