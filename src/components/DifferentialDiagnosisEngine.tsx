@@ -486,7 +486,7 @@ export function DifferentialDiagnosisEngine({
                     <div>
                       <h4 className="font-medium mb-3">Risk-Based Recommendations:</h4>
                       <ul className="space-y-2">
-                        {riskStratification.recommendations.map((rec, i) => (
+                        {(riskStratification.recommendations || []).map((rec, i) => (
                           <li key={i} className="flex items-start">
                             <span className="w-2 h-2 bg-primary rounded-full mt-2 mr-3 flex-shrink-0" />
                             {rec}
