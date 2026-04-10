@@ -1,7 +1,7 @@
 // ABOUTME: Unified clinical decision support component integrating investigations and treatment planning
 // ABOUTME: Provides seamless workflow between diagnostic testing and therapeutic decisions
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -82,6 +82,7 @@ export function ClinicalDecisionSupport({
 
   const { state } = useMedical();
   const saveClinicalPlanMutation = useSaveClinicalDecisionSupport();
+  const emptyDiagnoses = useMemo(() => [] as any[], []);
   
   const {
     recommendations,
@@ -91,7 +92,7 @@ export function ClinicalDecisionSupport({
     error: aiError
   } = useInvestigationRecommendations(
     chiefComplaint, 
-    [], // Will be populated with differential diagnoses
+    emptyDiagnoses,
     state.answers, 
     state.rosData
   );
@@ -131,9 +132,13 @@ export function ClinicalDecisionSupport({
 
   const loadClinicalData = async () => {
     try {
-      setLoading(true);
+    if (recommendations.length === 0) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
 
-      // Generate investigation intelligence
+    // Generate investigation intelligence
       const intelligenceData = await Promise.all(
         recommendations.map(async (rec) => {
           const intelligence = InvestigationIntelligenceService.generateInvestigationIntelligence(
