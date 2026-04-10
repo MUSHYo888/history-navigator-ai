@@ -385,7 +385,7 @@ export function DifferentialDiagnosisEngine({
                     </CardHeader>
                     <CardContent>
                       <ul className="space-y-2">
-                        {recommendations.immediateActions.map((action, i) => (
+                        {(recommendations.immediateActions || []).map((action, i) => (
                           <li key={i} className="flex items-start">
                             <span className="w-2 h-2 bg-red-500 rounded-full mt-2 mr-3 flex-shrink-0" />
                             {action}
@@ -404,11 +404,11 @@ export function DifferentialDiagnosisEngine({
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    {recommendations.investigationPriority.map((item, i) => (
+                    {(recommendations.investigationPriority || []).map((item, i) => (
                       <div key={i} className="mb-4 last:mb-0">
                         <h4 className="font-medium mb-2">{item.condition}</h4>
                         <div className="flex flex-wrap gap-2">
-                          {item.recommendedTests.map((test, j) => (
+                          {(item.recommendedTests || []).map((test, j) => (
                             <Badge key={j} variant="secondary">{test}</Badge>
                           ))}
                         </div>
@@ -426,7 +426,7 @@ export function DifferentialDiagnosisEngine({
                   </CardHeader>
                   <CardContent>
                     <ul className="space-y-2">
-                      {recommendations.followUpRecommendations.map((rec, i) => (
+                      {(recommendations.followUpRecommendations || []).map((rec, i) => (
                         <li key={i} className="flex items-start">
                           <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 mr-3 flex-shrink-0" />
                           {rec}
