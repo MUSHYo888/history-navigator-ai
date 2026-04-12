@@ -18,9 +18,10 @@ interface PatientDetailsProps {
   onBack: () => void;
   onStartAssessment: () => void;
   onResumeAssessment: (assessmentId: string) => void;
+  onViewCompletedAssessment?: (assessmentId: string, chiefComplaint: string) => void;
 }
 
-export function PatientDetails({ patient, onBack, onStartAssessment, onResumeAssessment }: PatientDetailsProps) {
+export function PatientDetails({ patient, onBack, onStartAssessment, onResumeAssessment, onViewCompletedAssessment }: PatientDetailsProps) {
   const { data: assessments, isLoading: assessmentsLoading } = useQuery({
     queryKey: ['patient-assessments', patient.id],
     queryFn: async () => {
@@ -178,15 +179,27 @@ export function PatientDetails({ patient, onBack, onStartAssessment, onResumeAss
                               </div>
                             )}
                           </div>
-                          {assessment.status === 'in-progress' && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => onResumeAssessment(assessment.id)}
-                            >
-                              Resume
-                            </Button>
-                          )}
+                          <div className="flex gap-2">
+                            {assessment.status === 'in-progress' && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => onResumeAssessment(assessment.id)}
+                              >
+                                Resume
+                              </Button>
+                            )}
+                            {assessment.status === 'completed' && onViewCompletedAssessment && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => onViewCompletedAssessment(assessment.id, assessment.chief_complaint)}
+                              >
+                                <FileText className="h-3 w-3 mr-1" />
+                                View Summary
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       </CardContent>
                     </Card>
