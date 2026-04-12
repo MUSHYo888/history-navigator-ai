@@ -102,10 +102,34 @@ export function PatientDetails({ patient, onBack, onStartAssessment, onResumeAss
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
-          <Button onClick={onStartAssessment} className="bg-primary hover:bg-primary/90">
-            <ClipboardList className="h-4 w-4 mr-2" />
-            New Assessment
-          </Button>
+          <div className="flex gap-2">
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" className="text-destructive border-destructive/30 hover:bg-destructive/10">
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete Patient
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Patient</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to delete {patient.name}? This will also delete all their assessments and related data. This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDeletePatient} className="bg-destructive hover:bg-destructive/90">
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+            <Button onClick={onStartAssessment} className="bg-primary hover:bg-primary/90">
+              <ClipboardList className="h-4 w-4 mr-2" />
+              New Assessment
+            </Button>
+          </div>
         </div>
 
         {/* Patient Info Card */}
