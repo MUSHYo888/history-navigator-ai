@@ -21,11 +21,19 @@ interface PatientListProps {
 export function PatientList({ onNewPatient, onSelectPatient, onBack }: PatientListProps) {
   const { data: patients = [], isLoading } = usePatients();
   const [searchTerm, setSearchTerm] = React.useState('');
+  const [statusFilter, setStatusFilter] = React.useState<'all' | 'active' | 'completed' | 'none'>('all');
 
-  const filteredPatients = patients.filter(patient =>
-    patient.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    patient.patientId.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredPatients = patients.filter(patient => {
+    const matchesSearch = patient.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      patient.patientId.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    if (!matchesSearch) return false;
+    
+    if (statusFilter === 'all') return true;
+    if (statusFilter === 'active') return patient.lastAssessment !== null;
+    if (statusFilter === 'none') return patient.lastAssessment === null;
+    return true;
+  });
 
   const getPatientInitials = (name: string) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
