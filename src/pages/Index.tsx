@@ -12,6 +12,7 @@ import { ChiefComplaintSelector } from '@/components/ChiefComplaintSelector';
 import { AssessmentWorkflow } from '@/components/AssessmentWorkflow';
 import { PatientList } from '@/components/PatientList';
 import { AssessmentResume } from '@/components/AssessmentResume';
+import { ClinicalSummary } from '@/components/ClinicalSummary';
 import { PatientDetails } from '@/components/PatientDetails';
 import { AssessmentErrorRecovery } from '@/components/AssessmentErrorRecovery';
 import { AIServiceTest } from '@/components/AIServiceTest';
@@ -22,7 +23,7 @@ import { useUpdatePatientAssessment } from '@/hooks/usePatients';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-type AppState = 'dashboard' | 'new-patient' | 'chief-complaint' | 'assessment' | 'patients' | 'patient-details' | 'summary' | 'resume-assessment' | 'error-recovery' | 'ai-testing' | 'analytics';
+type AppState = 'dashboard' | 'new-patient' | 'chief-complaint' | 'assessment' | 'patients' | 'patient-details' | 'summary' | 'view-summary' | 'resume-assessment' | 'error-recovery' | 'ai-testing' | 'analytics';
 
 const SESSION_KEYS = {
   assessmentId: 'history-pro:active-assessment-id',
@@ -244,6 +245,51 @@ const Index = () => {
     }
   };
 
+  const handleViewCompletedAssessment = async (assessmentId: string, chiefComplaint: string) => {
+    try {
+      const { data: assessment, error } = await supabase
+        .from('assessments')
+        .select(`*, patients!inner(*)`)
+        .eq('id', assessmentId)
+        .single();
+
+      if (error) throw error;
+      if (!assessment) throw new Error('Assessment not found');
+
+      dispatch({ 
+        type: 'SET_CURRENT_PATIENT', 
+        payload: {
+          id: assessment.patients.id,
+          name: assessment.patients.name,
+          age: assessment.patients.age,
+          gender: assessment.patients.gender as 'male' | 'female' | 'other',
+          patientId: assessment.patients.patient_id,
+          location: assessment.patients.location,
+          createdAt: assessment.patients.created_at
+        }
+      });
+
+      dispatch({
+        type: 'SET_CURRENT_ASSESSMENT',
+        payload: {
+          id: assessment.id,
+          patientId: assessment.patient_id,
+          chiefComplaint: assessment.chief_complaint,
+          status: assessment.status as 'in-progress' | 'completed' | 'draft',
+          currentStep: assessment.current_step,
+          createdAt: assessment.created_at,
+          updatedAt: assessment.updated_at
+        }
+      });
+
+      setSelectedComplaint(chiefComplaint);
+      setCurrentView('view-summary');
+    } catch (error) {
+      console.error('Failed to load completed assessment:', error);
+      toast.error('Failed to load assessment summary');
+    }
+  };
+
   if (!sessionChecked) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -313,6 +359,7 @@ const Index = () => {
             onBack={() => setCurrentView('dashboard')}
             onStartAssessment={() => setCurrentView('chief-complaint')}
             onResumeAssessment={handleResumeAssessment}
+            onViewCompletedAssessment={handleViewCompletedAssessment}
           />
         )}
         
@@ -391,6 +438,20 @@ const Index = () => {
               </button>
             </div>
           </div>
+        )}
+
+        {currentView === 'view-summary' && (
+          <ClinicalSummary
+            chiefComplaint={selectedComplaint}
+            onComplete={handleBackToDashboard}
+            onBack={() => {
+              if (state.currentPatient) {
+                setCurrentView('patient-details');
+              } else {
+                setCurrentView('dashboard');
+              }
+            }}
+          />
         )}
       </main>
     </div>
