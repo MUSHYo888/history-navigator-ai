@@ -26,9 +26,10 @@ interface ClinicalSummaryProps {
   chiefComplaint: string;
   onComplete: () => void;
   onBack: () => void;
+  readOnly?: boolean;
 }
 
-export function ClinicalSummary({ chiefComplaint, onComplete, onBack }: ClinicalSummaryProps) {
+export function ClinicalSummary({ chiefComplaint, onComplete, onBack, readOnly = false }: ClinicalSummaryProps) {
   const { state } = useMedical();
   const [differentials, setDifferentials] = useState<DifferentialDiagnosis[]>([]);
   const [advancedSupport, setAdvancedSupport] = useState<any>(null);
@@ -43,9 +44,46 @@ export function ClinicalSummary({ chiefComplaint, onComplete, onBack }: Clinical
   );
 
   useEffect(() => {
-    generateDifferentials();
-    generateAdvancedSupport();
-  }, []);
+    if (readOnly) {
+      loadSavedDifferentials();
+    } else {
+      generateDifferentials();
+      generateAdvancedSupport();
+    }
+  }, [readOnly]);
+
+  const loadSavedDifferentials = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const assessmentId = state.currentAssessment?.id;
+      if (!assessmentId) {
+        setLoading(false);
+        return;
+      }
+
+      const { data, error: fetchError } = await supabase
+        .from('differential_diagnoses')
+        .select('*')
+        .eq('assessment_id', assessmentId)
+        .order('probability', { ascending: false });
+
+      if (fetchError) throw fetchError;
+
+      const mapped = (data || []).map((d) => ({
+        condition: d.condition_name,
+        probability: Math.round(d.probability * 100),
+        explanation: d.explanation || '',
+        keyFeatures: Array.isArray(d.key_features) ? (d.key_features as string[]) : [],
+      }));
+      setDifferentials(mapped);
+    } catch (err) {
+      console.error('Error loading saved differentials:', err);
+      setError('Failed to load saved differential diagnoses.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const generateDifferentials = async () => {
     try {
