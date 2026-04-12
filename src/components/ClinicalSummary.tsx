@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Loader2, Brain, AlertTriangle, Activity, FileText, Send, NotepadText, User, Stethoscope, ClipboardList, Copy } from 'lucide-react';
 import { AIService } from '@/services/aiService';
+import { supabase } from '@/integrations/supabase/client';
 import { DifferentialDiagnosis } from '@/types/medical';
 import { useMedical } from '@/context/MedicalContext';
 import { useCompleteAssessment } from '@/hooks/useAssessment';
@@ -26,9 +27,10 @@ interface ClinicalSummaryProps {
   chiefComplaint: string;
   onComplete: () => void;
   onBack: () => void;
+  readOnly?: boolean;
 }
 
-export function ClinicalSummary({ chiefComplaint, onComplete, onBack }: ClinicalSummaryProps) {
+export function ClinicalSummary({ chiefComplaint, onComplete, onBack, readOnly = false }: ClinicalSummaryProps) {
   const { state } = useMedical();
   const [differentials, setDifferentials] = useState<DifferentialDiagnosis[]>([]);
   const [advancedSupport, setAdvancedSupport] = useState<any>(null);
@@ -43,9 +45,46 @@ export function ClinicalSummary({ chiefComplaint, onComplete, onBack }: Clinical
   );
 
   useEffect(() => {
-    generateDifferentials();
-    generateAdvancedSupport();
-  }, []);
+    if (readOnly) {
+      loadSavedDifferentials();
+    } else {
+      generateDifferentials();
+      generateAdvancedSupport();
+    }
+  }, [readOnly]);
+
+  const loadSavedDifferentials = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const assessmentId = state.currentAssessment?.id;
+      if (!assessmentId) {
+        setLoading(false);
+        return;
+      }
+
+      const { data, error: fetchError } = await supabase
+        .from('differential_diagnoses')
+        .select('*')
+        .eq('assessment_id', assessmentId)
+        .order('probability', { ascending: false });
+
+      if (fetchError) throw fetchError;
+
+      const mapped = (data || []).map((d) => ({
+        condition: d.condition_name,
+        probability: Math.round(d.probability * 100),
+        explanation: d.explanation || '',
+        keyFeatures: Array.isArray(d.key_features) ? (d.key_features as string[]) : [],
+      }));
+      setDifferentials(mapped);
+    } catch (err) {
+      console.error('Error loading saved differentials:', err);
+      setError('Failed to load saved differential diagnoses.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const generateDifferentials = async () => {
     try {
@@ -299,20 +338,22 @@ export function ClinicalSummary({ chiefComplaint, onComplete, onBack }: Clinical
                 <Brain className="h-5 w-5 text-secondary" />
                 <h3 className="text-xl font-semibold">Differential Diagnosis</h3>
               </div>
-              <Button
-                onClick={generateDifferentials}
-                variant="outline"
-                size="sm"
-                disabled={loading}
-                className="flex items-center gap-2"
-              >
-                {loading ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : (
-                  <Brain className="h-3 w-3" />
-                )}
-                Regenerate AI Analysis
-              </Button>
+              {!readOnly && (
+                <Button
+                  onClick={generateDifferentials}
+                  variant="outline"
+                  size="sm"
+                  disabled={loading}
+                  className="flex items-center gap-2"
+                >
+                  {loading ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Brain className="h-3 w-3" />
+                  )}
+                  Regenerate AI Analysis
+                </Button>
+              )}
             </div>
             
             <DifferentialDiagnosisList differentials={differentials} />
@@ -337,26 +378,28 @@ export function ClinicalSummary({ chiefComplaint, onComplete, onBack }: Clinical
           {/* Final Actions */}
           <div className="flex justify-between items-center pt-6">
             <Button variant="outline" onClick={onBack}>
-              Back to Clinical Decision Support
+              {readOnly ? 'Back to Patient Details' : 'Back to Clinical Decision Support'}
             </Button>
             
-            <Button 
-              onClick={handleCompleteAssessment}
-              disabled={completeAssessmentMutation.isPending}
-              className="flex items-center space-x-2"
-            >
-              {completeAssessmentMutation.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Completing...</span>
-                </>
-              ) : (
-                <>
-                  <FileText className="h-4 w-4" />
-                  <span>Complete Assessment</span>
-                </>
-              )}
-            </Button>
+            {!readOnly && (
+              <Button 
+                onClick={handleCompleteAssessment}
+                disabled={completeAssessmentMutation.isPending}
+                className="flex items-center space-x-2"
+              >
+                {completeAssessmentMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Completing...</span>
+                  </>
+                ) : (
+                  <>
+                    <FileText className="h-4 w-4" />
+                    <span>Complete Assessment</span>
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>

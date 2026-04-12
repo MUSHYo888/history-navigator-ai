@@ -7,11 +7,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Activity, ArrowLeft, Calendar, FileText, User, UserPlus, ClipboardList, Loader2 } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Activity, ArrowLeft, Calendar, FileText, User, UserPlus, ClipboardList, Loader2, Trash2 } from 'lucide-react';
 import { Patient } from '@/types/medical';
 import { supabase } from '@/integrations/supabase/client';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
+import { toast } from 'sonner';
 
 interface PatientDetailsProps {
   patient: Patient;
@@ -19,9 +21,11 @@ interface PatientDetailsProps {
   onStartAssessment: () => void;
   onResumeAssessment: (assessmentId: string) => void;
   onViewCompletedAssessment?: (assessmentId: string, chiefComplaint: string) => void;
+  onDeletePatient?: () => void;
 }
 
-export function PatientDetails({ patient, onBack, onStartAssessment, onResumeAssessment, onViewCompletedAssessment }: PatientDetailsProps) {
+export function PatientDetails({ patient, onBack, onStartAssessment, onResumeAssessment, onViewCompletedAssessment, onDeletePatient }: PatientDetailsProps) {
+  const queryClient = useQueryClient();
   const { data: assessments, isLoading: assessmentsLoading } = useQuery({
     queryKey: ['patient-assessments', patient.id],
     queryFn: async () => {
@@ -62,6 +66,33 @@ export function PatientDetails({ patient, onBack, onStartAssessment, onResumeAss
     }
   };
 
+  const handleDeletePatient = async () => {
+    try {
+      const { error } = await supabase.from('patients').delete().eq('id', patient.id);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ['patients'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      toast.success('Patient deleted successfully');
+      onDeletePatient?.();
+    } catch (err) {
+      console.error('Failed to delete patient:', err);
+      toast.error('Failed to delete patient');
+    }
+  };
+
+  const handleDeleteAssessment = async (assessmentId: string) => {
+    try {
+      const { error } = await supabase.from('assessments').delete().eq('id', assessmentId);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ['patient-assessments', patient.id] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      toast.success('Assessment deleted successfully');
+    } catch (err) {
+      console.error('Failed to delete assessment:', err);
+      toast.error('Failed to delete assessment');
+    }
+  };
+
   return (
     <div className="p-4 sm:p-6 animate-fade-in">
       <div className="max-w-4xl mx-auto space-y-6">
@@ -71,10 +102,34 @@ export function PatientDetails({ patient, onBack, onStartAssessment, onResumeAss
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
-          <Button onClick={onStartAssessment} className="bg-primary hover:bg-primary/90">
-            <ClipboardList className="h-4 w-4 mr-2" />
-            New Assessment
-          </Button>
+          <div className="flex gap-2">
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" className="text-destructive border-destructive/30 hover:bg-destructive/10">
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete Patient
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Patient</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to delete {patient.name}? This will also delete all their assessments and related data. This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDeletePatient} className="bg-destructive hover:bg-destructive/90">
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+            <Button onClick={onStartAssessment} className="bg-primary hover:bg-primary/90">
+              <ClipboardList className="h-4 w-4 mr-2" />
+              New Assessment
+            </Button>
+          </div>
         </div>
 
         {/* Patient Info Card */}
@@ -199,6 +254,27 @@ export function PatientDetails({ patient, onBack, onStartAssessment, onResumeAss
                                 View Summary
                               </Button>
                             )}
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="outline" size="sm" className="text-destructive border-destructive/30 hover:bg-destructive/10">
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete Assessment</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Are you sure you want to delete this assessment for "{assessment.chief_complaint}"? This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleDeleteAssessment(assessment.id)} className="bg-destructive hover:bg-destructive/90">
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
                           </div>
                         </div>
                       </CardContent>

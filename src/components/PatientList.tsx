@@ -21,11 +21,19 @@ interface PatientListProps {
 export function PatientList({ onNewPatient, onSelectPatient, onBack }: PatientListProps) {
   const { data: patients = [], isLoading } = usePatients();
   const [searchTerm, setSearchTerm] = React.useState('');
+  const [statusFilter, setStatusFilter] = React.useState<'all' | 'active' | 'completed' | 'none'>('all');
 
-  const filteredPatients = patients.filter(patient =>
-    patient.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    patient.patientId.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredPatients = patients.filter(patient => {
+    const matchesSearch = patient.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      patient.patientId.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    if (!matchesSearch) return false;
+    
+    if (statusFilter === 'all') return true;
+    if (statusFilter === 'active') return patient.lastAssessment !== null;
+    if (statusFilter === 'none') return patient.lastAssessment === null;
+    return true;
+  });
 
   const getPatientInitials = (name: string) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
@@ -84,6 +92,18 @@ export function PatientList({ onNewPatient, onSelectPatient, onBack }: PatientLi
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10 h-11 sm:h-10"
               />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {(['all', 'active', 'none'] as const).map((filter) => (
+                <Badge
+                  key={filter}
+                  variant={statusFilter === filter ? 'default' : 'outline'}
+                  className="cursor-pointer text-xs px-3 py-1"
+                  onClick={() => setStatusFilter(filter)}
+                >
+                  {filter === 'all' ? 'All' : filter === 'active' ? 'Has Assessments' : 'No Assessments'}
+                </Badge>
+              ))}
             </div>
             <Badge variant="outline" className="text-xs sm:text-sm px-3 py-2 w-fit">
               {filteredPatients.length} patients

@@ -360,6 +360,10 @@ const Index = () => {
             onStartAssessment={() => setCurrentView('chief-complaint')}
             onResumeAssessment={handleResumeAssessment}
             onViewCompletedAssessment={handleViewCompletedAssessment}
+            onDeletePatient={() => {
+              dispatch({ type: 'RESET_ASSESSMENT' });
+              setCurrentView('dashboard');
+            }}
           />
         )}
         
@@ -442,6 +446,7 @@ const Index = () => {
 
         {currentView === 'view-summary' && (
           <ClinicalSummary
+            readOnly
             chiefComplaint={selectedComplaint}
             onComplete={handleBackToDashboard}
             onBack={() => {
