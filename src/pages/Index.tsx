@@ -439,6 +439,20 @@ const Index = () => {
             </div>
           </div>
         )}
+
+        {currentView === 'view-summary' && (
+          <ClinicalSummary
+            chiefComplaint={selectedComplaint}
+            onComplete={handleBackToDashboard}
+            onBack={() => {
+              if (state.currentPatient) {
+                setCurrentView('patient-details');
+              } else {
+                setCurrentView('dashboard');
+              }
+            }}
+          />
+        )}
       </main>
     </div>
   );
