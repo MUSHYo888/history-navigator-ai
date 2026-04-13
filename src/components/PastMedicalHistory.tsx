@@ -93,8 +93,7 @@ export function PastMedicalHistory({ onSubmit, onBack }: PastMedicalHistoryProps
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = () => {
     // Compile social history into a readable string for backward compatibility
     const socialSummary = [
       socialData.smokingStatus && `Smoking: ${socialData.smokingStatus}${socialData.packYears ? ` (${socialData.packYears} pack-years)` : ''}`,
@@ -121,7 +120,7 @@ export function PastMedicalHistory({ onSubmit, onBack }: PastMedicalHistoryProps
           </p>
         </CardHeader>
         <CardContent className="space-y-6">
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
             {/* Medical Conditions */}
             <div className="space-y-4">
               <Label className="text-lg font-medium">Medical Conditions</Label>
@@ -351,7 +350,7 @@ export function PastMedicalHistory({ onSubmit, onBack }: PastMedicalHistoryProps
               <Button type="button" variant="outline" onClick={onBack}>
                 Back
               </Button>
-              <Button type="submit">
+              <Button type="button" onClick={handleSubmit}>
                 Continue to Physical Exam
               </Button>
             </div>
