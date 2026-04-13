@@ -47,11 +47,13 @@ export function ClinicalSummary({ chiefComplaint, onComplete, onBack }: Clinical
     generateAdvancedSupport();
   }, []);
 
-  const generateDifferentials = async () => {
+const generateDifferentials = async () => {
     try {
       setLoading(true);
       setError(null);
       
+      // ✅ Added the console.log opening
+      console.log({
         chiefComplaint,
         answers: state.answers,
         rosData: state.rosData
