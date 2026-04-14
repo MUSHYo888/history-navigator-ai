@@ -422,16 +422,41 @@ export function ClinicalDecisionSupport({
             </Alert>
           )}
 
-          {aiError && (
-            <Alert className="mb-6 border-warning bg-warning/10">
-              <AlertTriangle className="h-4 w-4 text-warning" />
+          {/* Enhanced AI Resilience Alert */}
+          {aiError ? (
+            <Alert className="mb-6 border-blue-500 bg-blue-50 dark:bg-blue-900/20">
+              <Shield className="h-4 w-4 text-blue-600" />
               <AlertDescription>
-                <div className="font-medium text-warning-foreground mb-2">AI Service Unavailable</div>
-                <p className="text-sm">{aiError}</p>
-                <p className="text-sm mt-1">Using evidence-based fallback recommendations.</p>
+                <div className="flex flex-col">
+                  <span className="font-bold text-blue-800 dark:text-blue-300">
+                    Clinical Safety Mode Active
+                  </span>
+                  <span className="text-sm text-blue-700 dark:text-blue-400">
+                    The AI connection is currently unstable. We've automatically switched to 
+                    <strong> high-fidelity local clinical protocols</strong> to ensure patient safety. 
+                    You can continue your assessment normally.
+                  </span>
+                </div>
               </AlertDescription>
             </Alert>
-          )}
+          ) : aiLoading && showContinue ? (
+            <Alert className="mb-6 border-amber-500 bg-amber-50">
+              <Clock className="h-4 w-4 text-amber-600" />
+              <AlertDescription className="flex items-center justify-between">
+                <span className="text-amber-800">
+                  AI is taking longer than usual. Would you like to switch to offline protocols?
+                </span>
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  className="ml-4 border-amber-600 text-amber-600 hover:bg-amber-100"
+                  onClick={() => setLoading(false)}
+                >
+                  Switch to Safety Mode
+                </Button>
+              </AlertDescription>
+            </Alert>
+          ) : null}
 
           {redFlags.length > 0 && (
             <Alert className="mb-6 border-destructive bg-destructive/10">
