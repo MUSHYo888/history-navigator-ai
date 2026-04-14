@@ -1,6 +1,6 @@
-
 // ABOUTME: Comprehensive patient summary displaying complete assessment data
 // ABOUTME: Integrates history, examination, clinical decisions, and AI-generated insights
+import { generateClinicalVignette } from '../utils/vignetteExporter';
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -47,12 +47,11 @@ export function ClinicalSummary({ chiefComplaint, onComplete, onBack }: Clinical
     generateAdvancedSupport();
   }, []);
 
-const generateDifferentials = async () => {
+  const generateDifferentials = async () => {
     try {
       setLoading(true);
       setError(null);
       
-      // ✅ Added the console.log opening
       console.log({
         chiefComplaint,
         answers: state.answers,
@@ -76,7 +75,6 @@ const generateDifferentials = async () => {
 
   const generateAdvancedSupport = async () => {
     try {
-      
       const support = await AIService.generateAdvancedClinicalSupport(
         chiefComplaint,
         state.answers,
@@ -116,6 +114,18 @@ const generateDifferentials = async () => {
     toast.success('Referral letter saved successfully');
   };
 
+  const handleCopyVignette = async () => {
+    const vignetteText = generateClinicalVignette(chiefComplaint, state.answers, state.rosData);
+    
+    try {
+      await navigator.clipboard.writeText(vignetteText);
+      alert('✅ Clinical vignette copied to clipboard! Ready to paste into Telegram.');
+    } catch (err) {
+      console.error('Failed to copy text: ', err);
+      alert('❌ Failed to copy. Please try again.');
+    }
+  }; 
+  
   const handleCopyToClipboard = async () => {
     const sections = [
       `PATIENT SUMMARY`,
@@ -252,6 +262,15 @@ const generateDifferentials = async () => {
               Generate Referral Letter
             </Button>
             
+            <Button
+              onClick={handleCopyVignette}
+              variant="outline"
+              className="flex items-center gap-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200"
+            >
+              <Copy className="h-4 w-4" />
+              Copy as Clinical Vignette
+            </Button>
+
             <Button
               onClick={handleCopyToClipboard}
               variant="outline"

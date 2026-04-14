@@ -1,4 +1,3 @@
-
 // ABOUTME: Centralized fallback data service for AI responses
 // ABOUTME: Provides mock questions, diagnoses, and clinical support when AI fails
 
@@ -149,68 +148,86 @@ export class FallbackDataService {
     const mockDiagnoses: Record<string, DifferentialDiagnosis[]> = {
       'headache': [
         {
-          condition: 'Tension-type headache',
-          probability: 65,
-          explanation: 'Most common type of headache, typically bilateral and pressing/tightening in quality',
-          keyFeatures: ['Bilateral location', 'Pressure sensation', 'Gradual onset']
+          condition: 'Subarachnoid Hemorrhage',
+          probability: 5,
+          explanation: 'Critical "do not miss" diagnosis. Often presents as thunderclap headache.',
+          keyFeatures: ['Worst headache of life', 'Sudden onset', 'Meningismus']
         },
         {
-          condition: 'Migraine',
-          probability: 25,
-          explanation: 'Recurrent headache disorder with characteristic features',
-          keyFeatures: ['Unilateral', 'Throbbing', 'Associated nausea']
-        },
-        {
-          condition: 'Cluster headache',
+          condition: 'Meningitis',
           probability: 10,
-          explanation: 'Severe unilateral headache with autonomic features',
-          keyFeatures: ['Severe unilateral pain', 'Short duration', 'Autonomic symptoms']
+          explanation: 'Infectious emergency requiring prompt antibiotics.',
+          keyFeatures: ['Fever', 'Neck stiffness', 'Photophobia']
+        },
+        {
+          condition: 'Migraine or Tension Headache',
+          probability: 85,
+          explanation: 'Most common causes of headache, but must rule out red flags first.',
+          keyFeatures: ['Throbbing or pressure', 'Gradual onset', 'History of similar headaches']
         }
       ],
       'fatigue': [
         {
-          condition: 'Viral syndrome',
-          probability: 40,
-          explanation: 'Common viral infection causing systemic fatigue',
-          keyFeatures: ['Recent onset', 'Associated symptoms', 'Self-limiting']
-        },
-        {
-          condition: 'Iron deficiency anemia',
+          condition: 'Anemia / Occult Bleeding',
           probability: 30,
-          explanation: 'Common cause of chronic fatigue, especially in women',
-          keyFeatures: ['Gradual onset', 'Exercise intolerance', 'Pale appearance']
+          explanation: 'Must rule out GI bleed or severe anemia in worsening fatigue.',
+          keyFeatures: ['Pallor', 'Tachycardia', 'Melena or heavy menses']
         },
         {
-          condition: 'Depression',
+          condition: 'Endocrine (Hypothyroidism / Adrenal Insufficiency)',
           probability: 20,
-          explanation: 'Mood disorder commonly presenting with fatigue',
-          keyFeatures: ['Mood changes', 'Sleep disturbance', 'Loss of interest']
+          explanation: 'Systemic causes of severe fatigue.',
+          keyFeatures: ['Weight changes', 'Cold intolerance', 'Hypotension']
+        },
+        {
+          condition: 'Viral Syndrome / Post-viral Fatigue',
+          probability: 50,
+          explanation: 'Common benign cause of generalized fatigue.',
+          keyFeatures: ['Recent illness', 'Myalgias', 'Self-limiting']
         }
       ],
       'chest pain': [
         {
-          condition: 'Musculoskeletal chest pain',
-          probability: 50,
-          explanation: 'Most common cause of chest pain in younger patients',
-          keyFeatures: ['Reproducible with movement', 'Localized tenderness', 'Sharp quality']
+          condition: 'Acute Coronary Syndrome (ACS)',
+          probability: 40,
+          explanation: 'Critical emergency. Always assume ACS until proven otherwise.',
+          keyFeatures: ['Crushing or pressure-like pain', 'Radiation to jaw/arm', 'Diaphoresis']
         },
         {
-          condition: 'Gastroesophageal reflux',
-          probability: 30,
-          explanation: 'Acid reflux causing chest discomfort',
-          keyFeatures: ['Burning sensation', 'Related to meals', 'Responds to antacids']
-        },
-        {
-          condition: 'Anxiety/panic disorder',
+          condition: 'Pulmonary Embolism (PE)',
           probability: 20,
-          explanation: 'Psychological cause of chest symptoms',
-          keyFeatures: ['Associated anxiety', 'Palpitations', 'Shortness of breath']
+          explanation: 'Life-threatening vascular occlusion.',
+          keyFeatures: ['Sudden onset', 'Pleuritic pain', 'Shortness of breath', 'Tachycardia']
+        },
+        {
+          condition: 'Aortic Dissection',
+          probability: 5,
+          explanation: 'Highly fatal if missed. Tearing sensation.',
+          keyFeatures: ['Tearing pain', 'Radiation to back', 'Unequal pulses']
+        },
+        {
+          condition: 'Musculoskeletal / GERD',
+          probability: 35,
+          explanation: 'Common benign causes, diagnoses of exclusion.',
+          keyFeatures: ['Reproducible pain', 'Burning sensation', 'Related to meals or movement']
         }
       ]
     };
 
     const complaint = chiefComplaint.toLowerCase();
-    return mockDiagnoses[complaint] || mockDiagnoses['fatigue'];
+    
+    // Try exact match first
+    let diagnoses = mockDiagnoses[complaint];
+    
+    // If no exact match, try partial matches
+    if (!diagnoses) {
+      const matchingKey = Object.keys(mockDiagnoses).find(key => 
+        complaint.includes(key) || key.includes(complaint)
+      );
+      diagnoses = matchingKey ? mockDiagnoses[matchingKey] : null;
+    }
+
+    return diagnoses || mockDiagnoses['fatigue']; // Default to systemic
   }
 
   static getFallbackInvestigations(chiefComplaint: string): InvestigationRecommendation[] {
@@ -254,12 +271,36 @@ export class FallbackDataService {
   }
 
   static getFallbackRedFlags(chiefComplaint: string): RedFlag[] {
+    const complaint = chiefComplaint.toLowerCase();
+
+    if (complaint.includes('chest pain')) {
+      return [
+        {
+          condition: 'Suspected ACS or PE',
+          severity: 'high',
+          description: 'Any new onset chest pain requires immediate cardiac evaluation to rule out fatal etiologies.',
+          immediateActions: ['Obtain STAT ECG', 'Activate emergency response if unstable', 'Consider Aspirin if no contraindications']
+        }
+      ];
+    }
+
+    if (complaint.includes('headache')) {
+      return [
+        {
+          condition: 'Suspected Subarachnoid Hemorrhage or Infection',
+          severity: 'high',
+          description: 'Thunderclap onset, fever, or neurologic deficits require emergent imaging.',
+          immediateActions: ['Urgent Non-con CT Head', 'Neurologic exam', 'Vital signs monitoring']
+        }
+      ];
+    }
+
     return [
       {
-        condition: 'Severe symptoms requiring urgent assessment',
+        condition: 'Vital Sign Instability',
         severity: 'high',
-        description: 'Patient requires immediate clinical evaluation',
-        immediateActions: ['Urgent physician review', 'Vital signs monitoring']
+        description: 'Patient requires immediate clinical evaluation for hemodynamic stability.',
+        immediateActions: ['Urgent physician review', 'Check ABCs (Airway, Breathing, Circulation)', 'Continuous monitoring']
       }
     ];
   }
