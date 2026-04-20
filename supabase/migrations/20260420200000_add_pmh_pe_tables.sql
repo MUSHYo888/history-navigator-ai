@@ -1,3 +1,19 @@
+-- Create security definer function to check if user can access assessment data
+CREATE OR REPLACE FUNCTION public.user_can_access_assessment(assessment_uuid uuid)
+RETURNS boolean
+LANGUAGE sql
+SECURITY DEFINER
+STABLE
+AS $$
+  SELECT EXISTS (
+    SELECT 1 
+    FROM public.assessments a
+    JOIN public.patients p ON a.patient_id = p.id
+    WHERE a.id = assessment_uuid 
+    AND p.healthcare_provider_id = auth.uid()
+  );
+$$;
+
 -- Create past_medical_history table
 CREATE TABLE public.past_medical_history (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,

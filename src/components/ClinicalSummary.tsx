@@ -54,6 +54,8 @@ export function ClinicalSummary({ chiefComplaint, onComplete, onBack }: Clinical
   const [showSOAPEditor, setShowSOAPEditor] = useState(false);
   const [showReferralGenerator, setShowReferralGenerator] = useState(false);
   
+  const isCompleted = state.currentAssessment?.status === 'completed';
+  
   // Guard to prevent duplicate AI calls in React Strict Mode
   const isGeneratingRef = useRef(false);
   const abortControllerRef = useRef<AbortController | null>(null);
