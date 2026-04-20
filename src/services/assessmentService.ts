@@ -146,6 +146,42 @@ export class AssessmentService {
     }
   }
 
+  static async savePastMedicalHistory(assessmentId: string, pmhData: any): Promise<void> {
+    const { error } = await supabase
+      .from('past_medical_history' as any)
+      .upsert({
+        assessment_id: assessmentId,
+        conditions: pmhData.conditions || [],
+        surgeries: pmhData.surgeries || [],
+        medications: pmhData.medications || [],
+        allergies: pmhData.allergies || [],
+        family_history: pmhData.familyHistory || '',
+        social_history: pmhData.socialHistory || '',
+        social_history_structured: pmhData.socialHistoryStructured || null
+      });
+
+    if (error) {
+      console.error('Error saving PMH data:', error);
+      throw new Error('Failed to save past medical history');
+    }
+  }
+
+  static async savePhysicalExamination(assessmentId: string, peData: any): Promise<void> {
+    const { error } = await supabase
+      .from('physical_examinations' as any)
+      .upsert({
+        assessment_id: assessmentId,
+        vital_signs: peData.vitalSigns || {},
+        systems: peData.systems || {},
+        general_appearance: peData.generalAppearance || ''
+      });
+
+    if (error) {
+      console.error('Error saving PE data:', error);
+      throw new Error('Failed to save physical examination');
+    }
+  }
+
   static async getAssessmentQuestions(assessmentId: string): Promise<Question[]> {
     const { data, error } = await supabase
       .from('questions')

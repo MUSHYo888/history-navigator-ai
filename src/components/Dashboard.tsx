@@ -9,9 +9,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { usePatients } from '@/hooks/usePatients';
 import { useDashboardStats } from '@/hooks/useDashboardStats';
 import { SystemHealth } from './SystemHealth';
-import { AdvancedAnalyticsDashboard } from './AdvancedAnalyticsDashboard';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface DashboardProps {
   onNewPatient: () => void;
@@ -23,8 +23,12 @@ interface DashboardProps {
 export function Dashboard({ onNewPatient, onViewPatients, onTestAI, onViewAnalytics }: DashboardProps) {
   const [showSystemHealth, setShowSystemHealth] = useState(false);
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   const { data: patients, isLoading: patientsLoading } = usePatients();
   const { data: dashboardStats, isLoading: statsLoading } = useDashboardStats();
+
+  // Simple admin check based on email domain (Update as needed)
+  const isAdmin = user?.email?.includes('admin') || false;
 
   // Realtime subscriptions for live updates
   useEffect(() => {
@@ -96,7 +100,7 @@ export function Dashboard({ onNewPatient, onViewPatients, onTestAI, onViewAnalyt
               <span className="sm:hidden">Analytics</span>
             </Button>
           )}
-          {onTestAI && (
+          {onTestAI && isAdmin && (
             <Button
               variant="outline"
               onClick={onTestAI}
@@ -195,7 +199,7 @@ export function Dashboard({ onNewPatient, onViewPatients, onTestAI, onViewAnalyt
           <CardTitle className="flex items-center justify-between">
             <span>System Status</span>
             <div className="flex gap-2">
-              {onTestAI && (
+              {onTestAI && isAdmin && (
                 <Button
                   variant="outline"
                   size="sm"

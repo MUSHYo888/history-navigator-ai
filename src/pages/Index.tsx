@@ -33,6 +33,7 @@ const Index = () => {
   const [currentView, setCurrentView] = useState<AppState>('dashboard');
   const [selectedComplaint, setSelectedComplaint] = useState<string>('');
   const [globalError, setGlobalError] = useState<string | null>(null);
+  const [complaintSource, setComplaintSource] = useState<'new-patient' | 'patients'>('new-patient');
   const [sessionChecked, setSessionChecked] = useState(false);
   
   const createAssessmentMutation = useCreateAssessment();
@@ -129,6 +130,7 @@ const Index = () => {
     try {
       dispatch({ type: 'SET_CURRENT_PATIENT', payload: patient });
       localStorage.setItem(SESSION_KEYS.patientId, patient.id);
+      setComplaintSource('new-patient');
       setCurrentView('chief-complaint');
     } catch (error) {
       handleError(error.message, 'patient creation');
@@ -296,6 +298,7 @@ const Index = () => {
             onNewPatient={handleNewPatient}
             onSelectPatient={(patient) => {
               dispatch({ type: 'SET_CURRENT_PATIENT', payload: patient });
+              setComplaintSource('patients');
               setCurrentView('chief-complaint');
             }}
             onBack={() => setCurrentView('dashboard')}
@@ -312,7 +315,7 @@ const Index = () => {
         {currentView === 'chief-complaint' && (
           <ChiefComplaintSelector
             onSelect={handleComplaintSelected}
-            onBack={() => setCurrentView('new-patient')}
+            onBack={() => setCurrentView(complaintSource)}
           />
         )}
         
@@ -364,10 +367,10 @@ const Index = () => {
           <div className="p-6">
             <div className="max-w-4xl mx-auto text-center">
               <h2 className="text-3xl font-bold text-gray-900 mb-4">
-                Assessment Complete! 
+                Assessment Complete for {state.currentPatient?.name || 'Patient'}! 
               </h2>
               <p className="text-gray-600 mb-8">
-                Clinical summary and differential diagnosis have been generated.
+                Clinical summary and differential diagnosis for {selectedComplaint || 'the chief complaint'} have been generated.
               </p>
               <button 
                 onClick={handleBackToDashboard}

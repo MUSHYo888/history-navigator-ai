@@ -14,6 +14,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import { LogOutcomeDialog } from './LogOutcomeDialog';
 
 interface PatientDetailsProps {
   patient: Patient;
@@ -253,6 +254,13 @@ export function PatientDetails({ patient, onBack, onStartAssessment, onResumeAss
                                 <FileText className="h-3 w-3 mr-1" />
                                 View Summary
                               </Button>
+                            )}
+                            {assessment.status === 'completed' && (
+                              <LogOutcomeDialog 
+                                assessmentId={assessment.id} 
+                                patientId={patient.id} 
+                                onSuccess={() => queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })}
+                              />
                             )}
                             <AlertDialog>
                               <AlertDialogTrigger asChild>

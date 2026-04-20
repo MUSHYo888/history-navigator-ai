@@ -16,7 +16,7 @@ import { AssessmentHeader } from './AssessmentHeader';
 import { LoadingState } from './LoadingState';
 import { ErrorBoundary } from './ErrorBoundary';
 import { useStepManager } from './StepManager';
-import { useSaveQuestions, useSaveAnswer } from '@/hooks/useAssessment';
+import { useSaveQuestions, useSaveAnswer, useSavePMH, useSavePE } from '@/hooks/useAssessment';
 import { toast } from 'sonner';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 
@@ -58,6 +58,8 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
 
   const saveQuestionsMutation = useSaveQuestions();
   const saveAnswerMutation = useSaveAnswer();
+  const savePMHMutation = useSavePMH();
+  const savePEMutation = useSavePE();
   const { updateStep } = useStepManager();
 
   const steps = [
@@ -303,6 +305,14 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
         payload: pmhData
       });
       
+      // Save PMH to Supabase Database
+      if (state.currentAssessment) {
+        await savePMHMutation.mutateAsync({
+          assessmentId: state.currentAssessment.id,
+          pmhData
+        });
+      }
+
       setShowPMH(false);
       setShowPE(true);
       await updateStep(4);
@@ -327,6 +337,12 @@ export function AssessmentWorkflow({ chiefComplaint, onComplete, onBack }: Asses
         payload: peData
       });
       
+      if (state.currentAssessment) {
+        await savePEMutation.mutateAsync({
+          assessmentId: state.currentAssessment.id,
+          peData
+        });
+      }
       
       // Update UI state
       setShowPE(false);

@@ -1,7 +1,7 @@
 // ABOUTME: Comprehensive patient summary displaying complete assessment data
 // ABOUTME: Integrates history, examination, clinical decisions, and AI-generated insights
 import { generateClinicalVignette } from '../utils/vignetteExporter';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -28,6 +28,20 @@ interface ClinicalSummaryProps {
   onBack: () => void;
 }
 
+// Helper to retry critical AI calls with exponential backoff
+const withRetry = async <T,>(fn: () => Promise<T>, retries = 3, delay = 1000, signal?: AbortSignal): Promise<T> => {
+  try {
+    if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+    return await fn();
+  } catch (error: any) {
+    if (error.name === 'AbortError' || signal?.aborted) throw error;
+    if (retries === 0) throw error;
+    console.warn(`AI Call failed, retrying in ${delay}ms... (${retries} retries left)`);
+    await new Promise(resolve => setTimeout(resolve, delay));
+    return withRetry(fn, retries - 1, delay * 2, signal);
+  }
+};
+
 export function ClinicalSummary({ chiefComplaint, onComplete, onBack }: ClinicalSummaryProps) {
   const { state } = useMedical();
   const [differentials, setDifferentials] = useState<DifferentialDiagnosis[]>([]);
@@ -37,55 +51,68 @@ export function ClinicalSummary({ chiefComplaint, onComplete, onBack }: Clinical
   const [showSOAPEditor, setShowSOAPEditor] = useState(false);
   const [showReferralGenerator, setShowReferralGenerator] = useState(false);
   
+  // Guard to prevent duplicate AI calls in React Strict Mode
+  const isGeneratingRef = useRef(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
   const completeAssessmentMutation = useCompleteAssessment();
   const { data: clinicalDecisionData, isLoading: clinicalDecisionLoading } = useGetClinicalDecisionSupport(
     state.currentAssessment?.id || ''
   );
 
   useEffect(() => {
-    generateDifferentials();
-    generateAdvancedSupport();
+    if (isGeneratingRef.current) return;
+    isGeneratingRef.current = true;
+
+    generateClinicalAnalysis();
+
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
   }, []);
 
-  const generateDifferentials = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      console.log({
-        chiefComplaint,
-        answers: state.answers,
-        rosData: state.rosData
-      });
-
-      const differentialDiagnoses = await AIService.generateDifferentialDiagnosis(
-        chiefComplaint,
-        state.answers,
-        state.rosData
-      );
-
-      setDifferentials(differentialDiagnoses);
-    } catch (err) {
-      console.error('Error generating differentials:', err);
-      setError('Failed to generate differential diagnosis. Using clinical reasoning based on available data.');
-    } finally {
-      setLoading(false);
+  const generateClinicalAnalysis = async () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
     }
-  };
+    
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+    const signal = abortController.signal;
 
-  const generateAdvancedSupport = async () => {
+    setLoading(true);
+    setError(null);
+
     try {
-      const support = await AIService.generateAdvancedClinicalSupport(
-        chiefComplaint,
-        state.answers,
-        state.rosData,
-        state.peData?.vitalSigns,
-        { age: 45 }
-      );
-      
+      const [diffs, support] = await Promise.all([
+        withRetry(() => AIService.generateDifferentialDiagnosis(
+          chiefComplaint,
+          state.answers,
+          state.rosData
+        ), 3, 1000, signal),
+        withRetry(() => AIService.generateAdvancedClinicalSupport(
+          chiefComplaint,
+          state.answers,
+          state.rosData,
+          state.peData?.vitalSigns,
+          { age: state.currentPatient?.age ?? 45 }
+        ), 3, 1000, signal)
+      ]);
+
+      if (signal.aborted) return;
+
+      setDifferentials(diffs);
       setAdvancedSupport(support);
-    } catch (error) {
-      console.error('Error generating advanced support:', error);
+    } catch (err: any) {
+      if (signal.aborted || err.name === 'AbortError') return;
+      console.error('Error generating AI analysis:', err);
+      setError('Failed to generate clinical analysis. Using clinical reasoning based on available data.');
+    } finally {
+      if (!signal.aborted) {
+        setLoading(false);
+      }
     }
   };
 
@@ -326,7 +353,10 @@ export function ClinicalSummary({ chiefComplaint, onComplete, onBack }: Clinical
                 <h3 className="text-xl font-semibold">Differential Diagnosis</h3>
               </div>
               <Button
-                onClick={generateDifferentials}
+              onClick={() => {
+                if (loading) return;
+                generateClinicalAnalysis();
+              }}
                 variant="outline"
                 size="sm"
                 disabled={loading}
