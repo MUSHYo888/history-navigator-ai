@@ -9,7 +9,6 @@ Sentry.init({
   // For example, automatic IP address collection on events
   sendDefaultPii: true
 });
-throw new Error("Sentry Test Error");
 const container = document.getElementById("root")!;
 const root = createRoot(container);
 root.render(<App />);
