@@ -84,12 +84,15 @@ export function PastMedicalHistory({ onSubmit, onBack }: PastMedicalHistoryProps
   });
 
   const addItem = (category: keyof Pick<PastMedicalHistoryData, 'conditions' | 'surgeries' | 'medications' | 'allergies'>, item: string) => {
-    if (item.trim() && !data[category].includes(item.trim())) {
-      setData(prev => ({
+    const trimmedItem = item.trim();
+    if (!trimmedItem) return;
+    setData(prev => {
+      if (prev[category].includes(trimmedItem)) return prev;
+      return {
         ...prev,
-        [category]: [...prev[category], item.trim()]
-      }));
-    }
+        [category]: [...prev[category], trimmedItem]
+      };
+    });
   };
 
   const removeItem = (category: keyof Pick<PastMedicalHistoryData, 'conditions' | 'surgeries' | 'medications' | 'allergies'>, item: string) => {
@@ -100,11 +103,12 @@ export function PastMedicalHistory({ onSubmit, onBack }: PastMedicalHistoryProps
   };
 
   const toggleCondition = (condition: string) => {
-    if (data.conditions.includes(condition)) {
-      removeItem('conditions', condition);
-    } else {
-      addItem('conditions', condition);
-    }
+    setData(prev => {
+      if (prev.conditions.includes(condition)) {
+        return { ...prev, conditions: prev.conditions.filter(i => i !== condition) };
+      }
+      return { ...prev, conditions: [...prev.conditions, condition] };
+    });
   };
 
   const handleSubmit = () => {

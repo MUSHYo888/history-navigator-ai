@@ -2,7 +2,7 @@
 // ABOUTME: Review of Systems component with 3-state toggles (Positive/Negative/Not Asked)
 // ABOUTME: Includes gender-based smart filtering and auto-flagging of positive findings
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -108,8 +108,14 @@ interface ReviewOfSystemsComponentProps {
 export function ReviewOfSystemsComponent({ onComplete, onBack }: ReviewOfSystemsComponentProps) {
   const { state, dispatch } = useMedical();
   const [symptomStates, setSymptomStates] = useState<Record<string, Record<string, SymptomState>>>({});
+  const symptomStatesRef = useRef<Record<string, Record<string, SymptomState>>>({});
   const [systemNotes, setSystemNotes] = useState<Record<string, string>>({});
   const saveROSMutation = useSaveROS();
+
+  // Keep ref perfectly in sync for the initial render and external updates
+  useEffect(() => {
+    symptomStatesRef.current = symptomStates;
+  }, [symptomStates]);
 
   const patientGender = state.currentPatient?.gender;
 
@@ -118,28 +124,39 @@ export function ReviewOfSystemsComponent({ onComplete, onBack }: ReviewOfSystems
     return system.genderFilter === patientGender;
   });
 
-  const toggleSymptom = (systemName: string, symptom: string) => {
-    setSymptomStates(prev => {
-      const systemSymptoms = prev[systemName] || {};
-      const current = systemSymptoms[symptom] || null;
-      // Cycle: null -> positive -> negative -> null
-      let next: SymptomState;
-      if (current === null) next = 'positive';
-      else if (current === 'positive') next = 'negative';
-      else next = null;
+  const toggleSymptomState = async (systemName: string, symptom: string, targetState: 'positive' | 'negative') => {
+    // 1. Get latest state from ref to avoid stale closures during rapid clicks
+    const prev = symptomStatesRef.current;
+    const current = prev[systemName]?.[symptom] || null;
+    const next = current === targetState ? null : targetState;
+    
+    // 2. Calculate the new arrays FIRST
+    const newSystemState = { ...(prev[systemName] || {}), [symptom]: next };
+    const newState = { ...prev, [systemName]: newSystemState };
+    
+    // 3. Update ref immediately so subsequent fast clicks see the change instantly
+    symptomStatesRef.current = newState;
 
-      return {
-        ...prev,
-        [systemName]: { ...systemSymptoms, [symptom]: next }
-      };
-    });
-  };
+    // 4. Update React UI instantly
+    setSymptomStates(newState);
 
-  const setSymptomDirect = (systemName: string, symptom: string, value: SymptomState) => {
-    setSymptomStates(prev => ({
-      ...prev,
-      [systemName]: { ...(prev[systemName] || {}), [symptom]: value }
-    }));
+    // 5. Create the exact payload for Supabase
+    const positive = Object.keys(newSystemState).filter(k => newSystemState[k] === 'positive');
+    const negative = Object.keys(newSystemState).filter(k => newSystemState[k] === 'negative');
+    const notes = systemNotes[systemName] || '';
+
+    // 6. Send the EXACT SAME calculated data to Supabase
+    if (state.currentAssessment) {
+      try {
+        await saveROSMutation.mutateAsync({
+          assessmentId: state.currentAssessment.id,
+          systemName,
+          rosData: { positive, negative, notes }
+        });
+      } catch (error) {
+        console.error('Failed to save ROS data:', error);
+      }
+    }
   };
 
   const handleSystemNotes = (systemName: string, notes: string) => {
@@ -260,7 +277,7 @@ export function ReviewOfSystemsComponent({ onComplete, onBack }: ReviewOfSystems
                             <div className="flex gap-1">
                               <button
                                 type="button"
-                                onClick={() => setSymptomDirect(system.name, symptom, currentState === 'positive' ? null : 'positive')}
+                                onClick={() => toggleSymptomState(system.name, symptom, 'positive')}
                                 className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
                                   currentState === 'positive'
                                     ? 'bg-red-500 text-white'
@@ -271,7 +288,7 @@ export function ReviewOfSystemsComponent({ onComplete, onBack }: ReviewOfSystems
                               </button>
                               <button
                                 type="button"
-                                onClick={() => setSymptomDirect(system.name, symptom, currentState === 'negative' ? null : 'negative')}
+                                onClick={() => toggleSymptomState(system.name, symptom, 'negative')}
                                 className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
                                   currentState === 'negative'
                                     ? 'bg-green-500 text-white'

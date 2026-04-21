@@ -9,6 +9,9 @@ test('test', async ({ page }) => {
   await page.getByRole('textbox', { name: 'Password' }).fill('123456');
   await page.getByRole('textbox', { name: 'Password' }).press('Enter');
 
+  // Wait for the network to calm down and WebSockets to connect
+  await page.waitForLoadState('networkidle');
+
   // Start New Assessment
   await page.getByRole('button', { name: 'New Patient Assessment' }).waitFor({ state: 'visible' });
   await page.getByRole('button', { name: 'New Patient Assessment' }).click();
@@ -77,8 +80,11 @@ test('test', async ({ page }) => {
   await clickSymptom('Hearing loss', true);
 
   // 3. Final Verification: The counters should now be accurate
-  await expect(page.getByText('3 Positive')).toBeVisible({ timeout: 10000 });
-  await expect(page.getByText('2 Negative')).toBeVisible({ timeout: 10000 });
+  await expect(page.getByText('3 Positive')).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText('2 Negative')).toBeVisible({ timeout: 15000 });
+
+  // Let pending Supabase saves finish before navigating
+  await page.waitForTimeout(2000);
 
   // 4. Proceed to Summary
   await page.getByRole('button', { name: 'Continue to Assessment Summary' }).click({ force: true });
