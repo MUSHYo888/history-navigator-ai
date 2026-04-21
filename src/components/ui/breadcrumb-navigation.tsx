@@ -57,7 +57,6 @@ export function BreadcrumbNavigation({ steps, onStepClick }: BreadcrumbNavigatio
                 </Badge>
               )}
             </div>
-            
             {index < steps.length - 1 && (
               <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
             )}

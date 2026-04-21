@@ -130,7 +130,7 @@ export class AssessmentService {
   }
 
   static async saveReviewOfSystems(assessmentId: string, systemName: string, rosData: { positive: string[]; negative: string[]; notes?: string }): Promise<void> {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('review_of_systems')
       .upsert({
         assessment_id: assessmentId,
@@ -138,8 +138,8 @@ export class AssessmentService {
         positive_symptoms: rosData.positive,
         negative_symptoms: rosData.negative,
         notes: rosData.notes
-      }, { onConflict: 'assessment_id' });
-
+      }, { onConflict: 'assessment_id,system_name' });
+      
     if (error) {
       console.error('Error saving ROS data:', error);
       throw new Error('Failed to save review of systems');
