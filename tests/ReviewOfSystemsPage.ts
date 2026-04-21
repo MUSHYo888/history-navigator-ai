@@ -1,7 +1,10 @@
 import { Page, expect } from '@playwright/test';
+import { BasePage } from './BasePage';
 
-export class ReviewOfSystemsPage {
-  constructor(public readonly page: Page) {}
+export class ReviewOfSystemsPage extends BasePage {
+  constructor(page: Page) {
+    super(page);
+  }
 
   async clickSymptom(name: string, isNegative = false) {
     const symptomRow = this.page.locator('div').filter({ hasText: new RegExp(`^${name}$`) }).locator('..');
@@ -17,7 +20,7 @@ export class ReviewOfSystemsPage {
   async continueToSummary() {
     const continueSummaryBtn = this.page.getByRole('button', { name: 'Continue to Assessment Summary' });
     await Promise.all([
-      this.page.waitForLoadState('networkidle'), 
+      this.waitForNetworkIdle(), 
       continueSummaryBtn.click({ force: true })
     ]);
   }

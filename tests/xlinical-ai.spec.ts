@@ -1,201 +1,170 @@
-import { test, expect } from '@playwright/test';
-import { ReviewOfSystemsPage } from './ReviewOfSystemsPage';
+import { test, expect } from './fixtures';
+import testData from './data/patient-data.json';
 
-test('Clinical AI Assessment Flow', async ({ page }) => {
-  // Give the overall test a generous timeout for full end-to-end runs
-  test.setTimeout(90000); 
-  
-  // ==========================================
-  // Authentication
-  // ==========================================
-  await page.goto('/auth');
-  await page.getByRole('textbox', { name: 'Email' }).fill('muslimkaki@gmail.com');
-  await page.getByRole('textbox', { name: 'Password' }).fill('123456');
-  await page.getByRole('textbox', { name: 'Password' }).press('Enter');
+export interface PatientTestData {
+  demographics: {
+    gender: string;
+    name: string;
+    age: string;
+    location: string;
+  };
+  chiefComplaint: string;
+  hpi: {
+    onset: string;
+    triggers: string;
+    coughType: string;
+    coughCharacter: string;
+    chestPain: string;
+    adaptiveQuestion: string;
+  };
+  ros: {
+    positive: string[];
+    negative: string[];
+  };
+  pmh: {
+    smoking: { status: string; packYears: string };
+    alcohol: string;
+    living: string;
+    condition: string;
+    checkboxCondition: string;
+  };
+  vitals: { bp: string; hr: string; rr: string; temp: string; o2: string };
+  pe: { general: string; findings: string[]; normalSystems: string[] };
+  cds: { investigationDetails: string; treatmentDetails: string };
+  referral: { specialty: string; urgencyLabel: string; doctor: string; facility: string; question: string };
+}
 
-  // Wait for the network to calm down and WebSockets to connect
-  await page.waitForLoadState('networkidle');
+for (const [scenario, data] of Object.entries(testData) as [string, PatientTestData][]) {
+  test(`Clinical AI Assessment Flow - ${scenario}`, async ({ page, dashboardPage, assessmentPage, rosPage, pmhPage, pePage, cdsPage, summaryPage }) => {
+    // Give the overall test a generous timeout for full end-to-end runs
+    test.setTimeout(90000); 
+    
+    // ==========================================
+    // Start New Assessment & Patient Registration
+    // ==========================================
+    await dashboardPage.startNewAssessment();
+    
+    await dashboardPage.registerPatient(data.demographics);
 
-  // ==========================================
-  // Start New Assessment
-  // ==========================================
-  const newAssessmentBtn = page.getByRole('button', { name: 'New Patient Assessment' });
-  await newAssessmentBtn.waitFor({ state: 'visible' });
-  await newAssessmentBtn.click();
+    await dashboardPage.enterChiefComplaint(data.chiefComplaint);
 
-  // ==========================================
-  // Patient Registration
-  // ==========================================
-  await page.getByRole('combobox').click();
-  await page.getByRole('option', { name: 'Female' }).click();
-  await page.getByRole('textbox', { name: 'Full Name *' }).fill('Test Patient');
-  await page.getByRole('spinbutton', { name: 'Age *' }).fill('55');
-  await page.locator('div').filter({ hasText: /^Location\/Ward \*$/ }).click();
-  await page.getByRole('textbox', { name: 'Location/Ward *' }).fill('ICU-A');
-  await page.getByRole('button', { name: 'Create Patient' }).click();
+    // ==========================================
+    // History of Present Illness (HPI) Phase 1
+    // ==========================================
+    await assessmentPage.answerQuestionByRadio(data.hpi.onset);
+    await assessmentPage.answerQuestionByText(data.hpi.triggers);
+    await assessmentPage.answerQuestionByText(data.hpi.coughType, true); // exact match to avoid collisions
+    await assessmentPage.answerQuestionByText(data.hpi.coughCharacter);
+    await assessmentPage.answerQuestionByText(data.hpi.chestPain);
+    await assessmentPage.setSeverityScaleAndContinue();
 
-  // ==========================================
-  // Chief Complaint
-  // ==========================================
-  await page.getByRole('textbox', { name: 'Enter custom chief complaint' }).fill('coughing');
-  await page.getByRole('button', { name: 'Continue' }).click();
+    // Adaptive Questions Phase 2
+    await assessmentPage.answerAdaptiveQuestion(data.hpi.adaptiveQuestion);
+    await assessmentPage.continueToReviewOfSystems();
 
-  // ==========================================
-  // History of Present Illness (HPI) Phase 1
-  // ==========================================
-  await page.getByRole('radio', { name: 'Gradual over days/weeks' }).click();
-  await page.getByRole('button', { name: 'Next Question' }).click();
-  await page.getByText('Cold air/allergens').click();
-  await page.getByRole('button', { name: 'Next Question' }).click();
-  await page.locator('div').filter({ hasText: /^Chronic cough$/ }).click();
-  await page.getByRole('button', { name: 'Next Question' }).click();
-  await page.getByText('Dry cough').click();
-  await page.getByRole('button', { name: 'Next Question' }).click();
-  await page.getByText('No chest pain').click();
-  await page.getByRole('button', { name: 'Next Question' }).click();
+    // ==========================================
+    // 6. Review of Systems (Batch Save Architecture)
+    // ==========================================
+    await expect(page, 'App redirected to login unexpectedly.').not.toHaveURL(/.*auth/);
 
-  // Severity Scale
-  await page.locator('.relative.h-2').click();
-  await page.getByRole('button', { name: 'Continue to Review of Systems' }).click();
+    // Perform the clicks
+    for (const symptom of data.ros.positive) {
+      await rosPage.clickSymptom(symptom);
+    }
+    for (const symptom of data.ros.negative) {
+      await rosPage.clickSymptom(symptom, true);
+    }
 
-  // Adaptive Questions Phase 2
-  const followUp = page.getByText('No recent major events');
-  await followUp.waitFor({ state: 'visible', timeout: 15000 });
-  await followUp.click({ force: true });
-  await page.getByRole('button', { name: 'Next Question' }).click();
-  await page.getByRole('button', { name: 'Continue to Review of Systems' }).click();
+    // Verify React state aggregated properly
+    await rosPage.verifySymptomCounts(data.ros.positive.length, data.ros.negative.length);
 
-  // ==========================================
-  // 6. Review of Systems (Batch Save Architecture)
-  // ==========================================
-  await expect(page, 'App redirected to login unexpectedly.').not.toHaveURL(/.*auth/);
+    // 🚨 BATCH SAVE TRIGGER 🚨
+    await rosPage.continueToSummary();
 
-  const rosPage = new ReviewOfSystemsPage(page);
+    // ==========================================
+    // 7. Past Medical & Social History
+    // ==========================================
+    await pmhPage.waitForPageLoad();
+    
+    await pmhPage.setSmokingStatus(data.pmh.smoking.status, data.pmh.smoking.packYears);
+    await pmhPage.setAlcoholUse(data.pmh.alcohol);
+    await pmhPage.setLivingSituation(data.pmh.living);
+    
+    await pmhPage.clickConditionCard(data.pmh.condition);
+    await pmhPage.checkConditionBox(data.pmh.checkboxCondition);
+    
+    // Wait for PMH batch save
+    await pmhPage.continueToPhysicalExam();
 
-  // Perform the clicks
-  await rosPage.clickSymptom('Fever');
-  await rosPage.clickSymptom('Chills');
-  await rosPage.clickSymptom('Headache');
-  await rosPage.clickSymptom('Vision changes', true);
-  await rosPage.clickSymptom('Hearing loss', true);
+    // ==========================================
+    // Physical Examination
+    // ==========================================
+    await pePage.fillVitalSigns(data.vitals);
 
-  // Verify React state aggregated properly
-  await rosPage.verifySymptomCounts(3, 2);
+    await pePage.fillGeneralAppearance(data.pe.general);
+    await pePage.navigateToSystemsTab();
+    
+    for (const finding of data.pe.findings) {
+      await pePage.clickFinding(finding);
+    }
+    for (const system of data.pe.normalSystems) {
+      await pePage.markSystemNormal(system);
+    }
 
-  // 🚨 BATCH SAVE TRIGGER 🚨
-  await rosPage.continueToSummary();
+    // Wait for Physical Exam save
+    await pePage.continueToAssessmentAndPlan();
 
-  // ==========================================
-  // 7. Past Medical & Social History
-  // ==========================================
-  await expect(page.getByRole('heading', { name: 'Past Medical History' })).toBeVisible({ timeout: 15000 });
-  
-  const statusCombobox = page.getByRole('combobox').filter({ hasText: 'Select status' });
-  await statusCombobox.click();
-  await page.getByRole('option', { name: 'Former smoker' }).click();
-  await page.getByRole('combobox').filter({ hasText: 'Select usage' }).click();
-  await page.getByRole('option', { name: 'None' }).click();
-  await page.getByPlaceholder('e.g. 10').fill('5');
-  
-  await page.getByRole('combobox').filter({ hasText: 'Select' }).click();
-  await page.getByRole('option', { name: 'Lives alone' }).click();
-  await page.locator('div').filter({ hasText: /^Cancer$/ }).click();
-  await page.getByRole('checkbox', { name: 'Asthma' }).check();
-  
-  // Wait for PMH save
-  await Promise.all([
-    page.waitForLoadState('networkidle'),
-    page.getByRole('button', { name: 'Continue to Physical Exam' }).click()
-  ]);
+    // ==========================================
+    // 9. Clinical Decision Support (AI Generation)
+    // ==========================================
+    await cdsPage.waitForAIGeneration();
+    await cdsPage.retryAIDiagnosis();
+    await cdsPage.orderInvestigations(data.cds.investigationDetails);
+    await cdsPage.setClinicalScores();
+    await cdsPage.setTreatmentPlan(data.cds.treatmentDetails);
+    await cdsPage.saveClinicalPlan();
 
-  // ==========================================
-  // Physical Examination
-  // ==========================================
-  await page.getByRole('textbox', { name: 'Blood Pressure' }).fill('120/70');
-  await page.getByRole('textbox', { name: 'Heart Rate' }).fill('75');
-  await page.getByRole('textbox', { name: 'Respiratory Rate' }).fill('20');
-  await page.getByRole('textbox', { name: 'Temperature' }).fill('98');
-  await page.getByRole('textbox', { name: 'Oxygen Saturation' }).fill('94');
-
-  await page.getByRole('tab', { name: 'General' }).click();
-  await page.getByRole('textbox', { name: /describe patient/i }).fill('Patient is alert and stable.');
-
-  const systemsTab = page.getByRole('tab', { name: 'Systems' });
-  await systemsTab.waitFor({ state: 'visible' });
-  await systemsTab.click();
-  
-  await page.getByLabel('Wheezes').click();
-  await page.getByLabel('Crackles/rales').click();
-  await page.locator('#cardiovascular-normal').click({ force: true });
-  await page.locator('#abdomen-normal').click();
-  await page.locator('#neurological-normal').click();
-  await page.locator('#musculoskeletal-normal').click();
-
-  // Wait for Physical Exam save
-  await Promise.all([
-    page.waitForLoadState('networkidle'),
-    page.getByRole('button', { name: 'Continue to Assessment & Plan' }).click()
-  ]);
-
-  // ==========================================
-  // 9. Clinical Decision Support (AI Generation)
-  // ==========================================
-  await expect(page.getByText(/Generating/)).toHaveCount(0, { timeout: 80000 });
-
-  await page.getByRole('tab', { name: 'AI Diagnosis' }).click();
-  await page.getByRole('button', { name: 'Retry' }).click();
-  
-  const investigationsTab = page.getByRole('tab', { name: 'Investigations' });
-  await investigationsTab.waitFor({ state: 'visible' });
-  await investigationsTab.click({ force: true });
-  await page.getByRole('checkbox').first().check({ force: true });
-  await page.getByRole('checkbox').nth(1).check({ force: true });
-  await page.getByRole('textbox', { name: 'Provide detailed clinical' }).fill('Routine blood work.');
-  
-  await page.getByRole('tab', { name: 'Clinical Scores' }).click();
-  await page.getByRole('checkbox', { name: 'Clinical signs of DVT' }).check({ force: true });
-  
-  await page.getByRole('tab', { name: 'Treatment & Management' }).click();
-  await page.getByRole('checkbox').first().check({ force: true });
-  await page.locator('div').filter({ hasText: /^Physical therapy$/ }).click();
-  await page.getByRole('checkbox').nth(1).check({ force: true });
-  await page.getByRole('textbox', { name: 'Outline specific follow-up' }).fill('Follow up in 2 weeks.');
-  
-  await page.getByRole('button', { name: 'Save Clinical Plan' }).click();
-
-  // ==========================================
-  // 10. Summary and Export Documentation
-  // ==========================================
-  await expect(page.getByText('Generating Patient Summary')).toBeHidden({ timeout: 60000 });
-  const finalButton = page.getByRole('button', { name: /(Skip to Summary|Complete Assessment)/ });
-  await finalButton.waitFor({ state: 'visible' });
-  await finalButton.click();
-
-  const downloadPromise = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Export PDF' }).click();
-  const download = await downloadPromise;
-  
-  await page.getByRole('button', { name: 'Create SOAP Note' }).click();
-  await page.getByRole('button', { name: 'Save SOAP Note' }).click();
-  await page.getByRole('button', { name: 'Generate Referral Letter' }).click();
-  
-  await page.getByRole('combobox').filter({ hasText: 'Select specialty' }).click();
-  await page.getByRole('option', { name: 'Cardiology' }).click();
-  await page.getByRole('combobox').filter({ hasText: 'RoutineStandard referral' }).click();
-  await page.getByRole('option', { name: 'Routine Standard referral' }).click();
-  await page.getByRole('textbox', { name: 'Recipient Doctor (Optional)' }).fill('Dr. Smith');
-  await page.getByRole('textbox', { name: 'Facility (Optional)' }).fill('Central Hospital');
-  await page.getByRole('textbox', { name: 'Clinical Question *' }).fill('Please evaluate for coronary artery disease and provide risk stratification');
-  
-  await page.getByRole('button', { name: 'Download PDF' }).click();
-  await page.getByRole('button', { name: 'Save Referral Letter' }).click();
-  
-  page.once('dialog', dialog => {
-    console.log(`Dialog message: ${dialog.message()}`);
-    dialog.dismiss().catch(() => {});
+    // ==========================================
+    // 10. Summary and Export Documentation
+    // ==========================================
+    await summaryPage.waitForSummaryGeneration();
+    await summaryPage.exportPDF();
+    await summaryPage.createAndSaveSOAPNote();
+    
+    await summaryPage.generateReferralLetter(data.referral);
+    
+    page.once('dialog', dialog => {
+      console.log(`Dialog message: ${dialog.message()}`);
+      dialog.dismiss().catch(() => {});
+    });
+    
+    await summaryPage.copyClinicalVignette();
+    await summaryPage.completeAndReturnToDashboard();
   });
+}
+
+// ==========================================
+// Isolated Test: AI Fallback / Offline Mode
+// ==========================================
+test('AI Fallback Mode - API Failure Simulation', async ({ page, dashboardPage }) => {
+  // 🚨 NETWORK INTERCEPTION: MOCK THE AI API TO FAIL 🚨
+  // This traps all outgoing requests to Groq and immediately returns a 500 Server Error
+  await page.route('https://api.groq.com/**', async route => {
+    await route.fulfill({
+      status: 500,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: { message: 'Simulated API Outage for Testing' } })
+    });
+  });
+
+  await dashboardPage.startNewAssessment();
+  await dashboardPage.registerPatient(testData.defaultPatient.demographics);
   
-  await page.getByRole('button', { name: 'Copy as Clinical Vignette' }).click();
-  await page.getByRole('button', { name: 'Complete Assessment' }).click();
-  await page.getByRole('button', { name: 'Return to Dashboard' }).click();
+  // We use "headache" because FallbackDataService has a specific hardcoded question for it
+  await dashboardPage.enterChiefComplaint('headache');
+  
+  // Due to our withRetry logic, the app will attempt 3 times (taking ~3 seconds)
+  // before automatically switching to FallbackDataService.
+  // We assert that the exact fallback question successfully renders!
+  await page.getByText('How did the headache begin?').waitFor({ state: 'visible', timeout: 15000 });
 });
