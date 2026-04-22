@@ -79,7 +79,7 @@ export function useInvestigationRecommendations(
     if (chiefComplaint) {
       fetchRecommendations();
     }
-  }, [chiefComplaint, differentialDiagnoses, answers, rosData]);
+  }, [chiefComplaint]); // answers/rosData/diagnoses are new object refs each render — only re-fetch when complaint changes
 
   return {
     recommendations,

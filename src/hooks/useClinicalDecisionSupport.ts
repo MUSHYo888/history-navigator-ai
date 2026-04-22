@@ -38,7 +38,7 @@ export function useSaveClinicalDecisionSupport() {
           treatment_plan: clinicalPlan.treatment,
           clinical_notes: clinicalPlan.clinicalNotes,
           updated_at: new Date().toISOString()
-        })
+        }, { onConflict: 'assessment_id' })
         .select()
         .single();
 

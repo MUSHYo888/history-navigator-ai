@@ -118,7 +118,7 @@ export function ClinicalDecisionSupport({
     } else if (!aiLoading) {
       setLoading(false);
     }
-  }, [recommendationsJson, aiLoading, diagnoses]); 
+  }, [recommendationsJson, aiLoading]); 
 
   // Show "continue anyway" after 15 seconds of loading
   useEffect(() => {
