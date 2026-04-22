@@ -1,5 +1,5 @@
 import { test, expect } from './fixtures';
-import testData from './data/patient-data.json';
+import { type Dialog } from '@playwright/test';
 
 export interface PatientTestData {
   demographics: {
@@ -33,6 +33,60 @@ export interface PatientTestData {
   cds: { investigationDetails: string; treatmentDetails: string };
   referral: { specialty: string; urgencyLabel: string; doctor: string; facility: string; question: string };
 }
+
+const testData: Record<string, PatientTestData> = {
+  "defaultPatient": {
+    "demographics": {
+      "gender": "Male",
+      "name": "John Doe",
+      "age": "45",
+      "location": "Ward A"
+    },
+    "chiefComplaint": "headache",
+    "hpi": {
+      "onset": "Sudden",
+      "triggers": "Bright lights",
+      "coughType": "Dry",
+      "coughCharacter": "Hacking",
+      "chestPain": "None",
+      "adaptiveQuestion": "Yes"
+    },
+    "ros": {
+      "positive": ["Nausea", "Photophobia"],
+      "negative": ["Fever", "Neck stiffness"]
+    },
+    "pmh": {
+      "smoking": { "status": "Never smoked", "packYears": "0" },
+      "alcohol": "Occasional",
+      "living": "With family",
+      "condition": "Hypertension",
+      "checkboxCondition": "Diabetes"
+    },
+    "vitals": {
+      "bp": "120/80",
+      "hr": "72",
+      "rr": "16",
+      "temp": "36.6",
+      "o2": "98"
+    },
+    "pe": {
+      "general": "Alert and oriented",
+      "findings": ["Pupils equal and reactive"],
+      "normalSystems": ["resp", "cardio"]
+    },
+    "cds": {
+      "investigationDetails": "CT Brain requested",
+      "treatmentDetails": "Rest in dark room, Paracetamol 1g"
+    },
+    "referral": {
+      "specialty": "Neurology",
+      "urgencyLabel": "Routine",
+      "doctor": "Dr. Smith",
+      "facility": "General Hospital",
+      "question": "Evaluate for chronic migraine management"
+    }
+  }
+};
 
 for (const [scenario, data] of Object.entries(testData) as [string, PatientTestData][]) {
   test(`Clinical AI Assessment Flow - ${scenario}`, async ({ page, dashboardPage, assessmentPage, rosPage, pmhPage, pePage, cdsPage, summaryPage }) => {
@@ -133,7 +187,7 @@ for (const [scenario, data] of Object.entries(testData) as [string, PatientTestD
     
     await summaryPage.generateReferralLetter(data.referral);
     
-    page.once('dialog', dialog => {
+    page.once('dialog', (dialog: Dialog) => {
       console.log(`Dialog message: ${dialog.message()}`);
       dialog.dismiss().catch(() => {});
     });
