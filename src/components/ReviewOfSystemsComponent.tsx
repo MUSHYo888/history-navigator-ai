@@ -105,10 +105,14 @@ interface ReviewOfSystemsComponentProps {
   onBack: () => void;
 }
 
+// Module-level cache to preserve state across unexpected remounts/background refreshes
+let draftSymptomStates: Record<string, Record<string, SymptomState>> = {};
+let draftSystemNotes: Record<string, string> = {};
+
 export function ReviewOfSystemsComponent({ onComplete, onBack }: ReviewOfSystemsComponentProps) {
   const { state, dispatch } = useMedical();
-  const [symptomStates, setSymptomStates] = useState<Record<string, Record<string, SymptomState>>>({});
-  const [systemNotes, setSystemNotes] = useState<Record<string, string>>({});
+  const [symptomStates, setSymptomStates] = useState<Record<string, Record<string, SymptomState>>>(draftSymptomStates);
+  const [systemNotes, setSystemNotes] = useState<Record<string, string>>(draftSystemNotes);
   const [isSaving, setIsSaving] = useState(false);
   const saveROSMutation = useSaveROS();
 
@@ -124,15 +128,21 @@ export function ReviewOfSystemsComponent({ onComplete, onBack }: ReviewOfSystems
       const current = prev[systemName]?.[symptom] || null;
       const next = current === targetState ? null : targetState;
       
-      return {
+      const nextState = {
         ...prev,
         [systemName]: { ...(prev[systemName] || {}), [symptom]: next }
       };
+      draftSymptomStates = nextState; // Synchronous cache update
+      return nextState;
     });
   };
 
   const handleSystemNotes = (systemName: string, notes: string) => {
-    setSystemNotes(prev => ({ ...prev, [systemName]: notes }));
+    setSystemNotes(prev => {
+      const nextState = { ...prev, [systemName]: notes };
+      draftSystemNotes = nextState; // Synchronous cache update
+      return nextState;
+    });
   };
 
   const getPositiveSymptoms = (systemName: string): string[] => {
@@ -177,6 +187,11 @@ export function ReviewOfSystemsComponent({ onComplete, onBack }: ReviewOfSystems
           })
         );
         await Promise.all(savePromises);
+
+        // Clear the module cache for the next assessment
+        draftSymptomStates = {};
+        draftSystemNotes = {};
+
         onComplete();
       } catch (error) {
         console.error('Failed to save ROS data:', error);
@@ -184,6 +199,10 @@ export function ReviewOfSystemsComponent({ onComplete, onBack }: ReviewOfSystems
         setIsSaving(false);
       }
     } else {
+      // Clear the module cache for the next assessment
+      draftSymptomStates = {};
+      draftSystemNotes = {};
+
       onComplete();
     }
   };

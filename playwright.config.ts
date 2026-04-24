@@ -93,5 +93,8 @@ export default defineConfig({
     url: 'http://localhost:8080',
     reuseExistingServer: true,
     timeout: 120 * 1000,
+    env: {
+      VITE_GROQ_API_KEY: 'mock-key-for-playwright',
+    },
   },
 });

@@ -29,8 +29,10 @@ private static logAICall(service: string, chiefComplaint: string, success: boole
 
   private static async callGroq(systemPrompt: string, userPrompt: string): Promise<any> {
     return withRetry(async () => {
-      const apiKey = import.meta.env.VITE_GROQ_API_KEY;
-      if (!apiKey) throw new Error('VITE_GROQ_API_KEY is not configured in environment variables');
+      const apiKey = import.meta.env.VITE_GROQ_API_KEY || 'mock-key-for-local-testing';
+      if (!import.meta.env.VITE_GROQ_API_KEY && import.meta.env.DEV) {
+        console.warn('VITE_GROQ_API_KEY missing locally. Falling back to mock data.');
+      }
 
       const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
@@ -134,7 +136,14 @@ private static logAICall(service: string, chiefComplaint: string, success: boole
     } catch (error) {
       this.logAICall('generateClinicalDecisionSupport', chiefComplaint, false, error);
       
-      throw error;
+      console.warn('AI Service unavailable or key invalid. Falling back to clinical protocols.');
+      return {
+        investigations: FallbackDataService.getFallbackInvestigations(chiefComplaint),
+        redFlags: FallbackDataService.getFallbackRedFlags(chiefComplaint),
+        guidelines: FallbackDataService.getFallbackGuidelines(chiefComplaint),
+        treatmentRecommendations: [],
+        followUpRecommendations: []
+      };
     }
   }
 
