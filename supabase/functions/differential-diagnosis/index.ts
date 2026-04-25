@@ -148,11 +148,17 @@ Physical Examination: ${JSON.stringify(clinicalContext.physicalExam)}`;
     const data = await response.json();
     const content = data.choices[0].message.content;
 
-    let differentialDiagnoses: DifferentialDiagnosis[];
+    let differentialDiagnoses: DifferentialDiagnosis[] = [];
+    let pertinentNegatives: string[] = [];
+    let soapNote: string = '';
+
     try {
-      const match = content.match(/\[[\s\S]*\]/);
-      if (!match) throw new Error('No JSON array in response');
-      differentialDiagnoses = JSON.parse(match[0]) as DifferentialDiagnosis[];
+      const match = content.match(/\{[\s\S]*\}/);
+      if (!match) throw new Error('No JSON object in response');
+      const parsedData = JSON.parse(match[0]);
+      differentialDiagnoses = parsedData.differentialDiagnoses || parsedData.differentials || [];
+      pertinentNegatives = parsedData.pertinentNegatives || [];
+      soapNote = parsedData.soapNote || '';
     } catch {
       console.error('[differential-diagnosis] Parse failed, using fallback');
       differentialDiagnoses = generateFallbackDifferentials(chiefComplaint);

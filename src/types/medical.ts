@@ -1,3 +1,5 @@
+import { Json } from '@/integrations/supabase/types';
+
 export interface Patient {
   id: string;
   name: string;
@@ -17,6 +19,10 @@ export interface Assessment {
   currentStep: number;
   createdAt: string;
   updatedAt: string;
+  family_history?: string;
+  social_history?: string;
+  vital_signs?: Json;
+  systems?: Json;
 }
 
 export interface Question {

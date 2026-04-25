@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { User, Settings, LogOut, Menu, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 
 export function Header() {
@@ -14,7 +14,7 @@ export function Header() {
   };
 
   return (
-    <header className="bg-background border-b border-border px-4 sm:px-6 py-3 sm:py-4 sticky top-0 z-50 backdrop-blur-sm bg-background/95 shadow-sm transition-smooth">
+    <header className="border-b border-border px-4 sm:px-6 py-3 sm:py-4 sticky top-0 z-50 backdrop-blur-sm bg-background/95 shadow-sm transition-smooth">
       <div className="flex items-center justify-between max-w-7xl mx-auto">
         {/* Logo and Title */}
         <div className="flex items-center space-x-2 sm:space-x-4">

@@ -2,7 +2,8 @@
 // ABOUTME: Handles assessment creation, updates, and data persistence
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { AssessmentService } from '@/services/assessmentService';
-import { Question, Answer } from '@/types/medical';
+import { Question, Answer, PastMedicalHistoryData } from '@/types/medical';
+import { PhysicalExamData } from '@/types/physical-exam';
 import { toast } from 'sonner';
 
 export function useCreateAssessment() {
@@ -115,8 +116,8 @@ export function useCompleteAssessment() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ assessmentId, payload }: { assessmentId: string; payload?: any }) => AssessmentService.completeAssessment(assessmentId, payload),
-    onSuccess: (_, { assessmentId }) => {
+    mutationFn: (assessmentId: string) => AssessmentService.completeAssessment(assessmentId),
+    onSuccess: (_, assessmentId) => {
       toast.success('Assessment completed successfully');
       queryClient.invalidateQueries({ queryKey: ['assessment', assessmentId] });
       queryClient.invalidateQueries({ queryKey: ['patients'] });
@@ -132,7 +133,7 @@ export function useSavePMH() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ assessmentId, pmhData }: { assessmentId: string; pmhData: any }) => {
+    mutationFn: async ({ assessmentId, pmhData }: { assessmentId: string; pmhData: PastMedicalHistoryData }) => {
       return AssessmentService.savePastMedicalHistory(assessmentId, pmhData);
     },
     onSuccess: (_, { assessmentId }) => {
@@ -149,7 +150,7 @@ export function useSavePE() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ assessmentId, peData }: { assessmentId: string; peData: any }) => {
+    mutationFn: async ({ assessmentId, peData }: { assessmentId: string; peData: PhysicalExamData }) => {
       return AssessmentService.savePhysicalExamination(assessmentId, peData);
     },
     onSuccess: (_, { assessmentId }) => {

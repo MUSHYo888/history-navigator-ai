@@ -1,21 +1,44 @@
 // ABOUTME: Main AI service orchestrator for clinical AI features with enhanced error handling
 // ABOUTME: Coordinates specialized AI services and provides unified interface with fallback mechanisms
 
-import { Question, DifferentialDiagnosis, DDxResponse } from '@/types/medical';
-import { AdvancedClinicalSupport } from '@/types/clinical-scores';
+import { Question, DifferentialDiagnosis, Answer, ReviewOfSystems, ClinicalDecisionSupport } from '@/types/medical';
+import { AdvancedClinicalSupport, SeverityScore, ClinicalAlert } from '@/types/clinical-scores';
 import { ClinicalScoringService } from '@/services/clinicalScoringService';
 import { FallbackDataService } from './fallback/FallbackDataService';
 import { withRetry } from '@/utils/withRetry';
 
+export interface DDxResponse {
+  diagnosis?: string;
+  confidence?: number;
+  reasoning?: string;
+  treatment_suggestions?: string[];
+  differentialDiagnoses: DifferentialDiagnosis[];
+  pertinentNegatives: string[];
+  soapNote: string;
+}
+
+export interface AssessmentContext {
+  age?: number;
+  gender?: string;
+  symptoms?: string[];
+  systolicBP?: number | string;
+  diastolicBP?: number | string;
+  heartRate?: number | string;
+  respiratoryRate?: number | string;
+  temperature?: number | string;
+  oxygenSaturation?: number | string;
+}
+
 export class AIService {
-private static logAICall(service: string, chiefComplaint: string, success: boolean, error?: any) {
+  private static logAICall(service: string, chiefComplaint: string, success: boolean, error?: Error | unknown) {
     const timestamp = new Date().toISOString();
+    const errorMessage = error instanceof Error ? error.message : 'An unknown clinical error occurred';
     console.log({
       timestamp,
       service,
       chiefComplaint,
       success,
-      error: error?.message || null
+      error: error ? errorMessage : null
     });
   }
 
@@ -27,7 +50,7 @@ private static logAICall(service: string, chiefComplaint: string, success: boole
     });
   }
 
-  private static async callGroq(systemPrompt: string, userPrompt: string): Promise<any> {
+  private static async callGroq(systemPrompt: string, userPrompt: string): Promise<Record<string, unknown>> {
     return withRetry(async () => {
       const apiKey = import.meta.env.VITE_GROQ_API_KEY || 'mock-key-for-local-testing';
       if (!import.meta.env.VITE_GROQ_API_KEY && import.meta.env.DEV) {
@@ -63,7 +86,7 @@ private static logAICall(service: string, chiefComplaint: string, success: boole
 
   static async generateQuestions(
     chiefComplaint: string, 
-    previousAnswers?: Record<string, any>
+    previousAnswers?: Record<string, Answer>
   ): Promise<Question[]> {
     try {
       const systemPrompt = `You are a clinical AI assistant generating focused medical history questions.
@@ -73,8 +96,8 @@ private static logAICall(service: string, chiefComplaint: string, success: boole
       
       const userPrompt = `Chief complaint: ${chiefComplaint}\nPrevious answers: ${JSON.stringify(previousAnswers || {})}`;
       
-      const result = await this.callGroq(systemPrompt, userPrompt);
-      const questions = (result.questions || []).map((q: any) => ({
+      const result = await this.callGroq(systemPrompt, userPrompt) as { questions?: Partial<Question>[] };
+      const questions = (result.questions || []).map((q: Partial<Question>) => ({
         ...q,
         id: q.id && q.id !== 'uuid' ? q.id : this.generateUUID(),
         type: q.type || 'text',
@@ -83,7 +106,7 @@ private static logAICall(service: string, chiefComplaint: string, success: boole
       }));
 
       this.logAICall('generateQuestions', chiefComplaint, true);
-      return questions;
+      return questions as Question[];
     } catch (error) {
       this.logAICall('generateQuestions', chiefComplaint, false, error);
       
@@ -93,8 +116,8 @@ private static logAICall(service: string, chiefComplaint: string, success: boole
 
   static async generateDifferentialDiagnosis(
     chiefComplaint: string,
-    answers: Record<string, any>,
-    rosData?: Record<string, any>
+    answers: Record<string, Answer>,
+    rosData?: ReviewOfSystems
   ): Promise<DDxResponse> {
     try {
       const systemPrompt = `You are an expert clinical diagnostician. Analyze the clinical presentation and generate a comprehensive differential diagnosis list.
@@ -108,7 +131,7 @@ private static logAICall(service: string, chiefComplaint: string, success: boole
 
       const userPrompt = `Chief Complaint: ${chiefComplaint}\nPatient answers: ${JSON.stringify(answers)}\nReview of Systems: ${JSON.stringify(rosData || {})}`;
       
-      const result = await this.callGroq(systemPrompt, userPrompt);
+      const result = await this.callGroq(systemPrompt, userPrompt) as { differentials?: DifferentialDiagnosis[], pertinentNegatives?: string[], soapNote?: string };
 
       this.logAICall('generateDifferentialDiagnosis', chiefComplaint, true);
       return {
@@ -129,10 +152,10 @@ private static logAICall(service: string, chiefComplaint: string, success: boole
 
   static async generateClinicalDecisionSupport(
     chiefComplaint: string,
-    differentialDiagnoses: any[],
-    answers: Record<string, any>,
-    rosData?: Record<string, any>
-  ): Promise<any> {
+    differentialDiagnoses: DifferentialDiagnosis[],
+    answers: Record<string, Answer>,
+    rosData?: ReviewOfSystems
+  ): Promise<ClinicalDecisionSupport> {
     try {
       const systemPrompt = `You are a clinical AI assistant providing investigation recommendations and clinical decision support.
       Return ONLY a valid JSON object matching this exact structure:
@@ -141,7 +164,7 @@ private static logAICall(service: string, chiefComplaint: string, success: boole
 
       const userPrompt = `Chief complaint: ${chiefComplaint}\nDifferential diagnoses: ${JSON.stringify(differentialDiagnoses)}\nPatient answers: ${JSON.stringify(answers)}\nReview of Systems: ${JSON.stringify(rosData || {})}`;
       
-      const result = await this.callGroq(systemPrompt, userPrompt);
+      const result = await this.callGroq(systemPrompt, userPrompt) as unknown as ClinicalDecisionSupport;
 
       this.logAICall('generateClinicalDecisionSupport', chiefComplaint, true);
       return result;
@@ -161,15 +184,15 @@ private static logAICall(service: string, chiefComplaint: string, success: boole
 
   static async generateAdvancedClinicalSupport(
     chiefComplaint: string,
-    answers: Record<string, any>,
-    rosData: Record<string, any>,
-    vitalSigns?: any,
-    demographics?: any
+    answers: Record<string, Answer>,
+    rosData: ReviewOfSystems,
+    vitalSigns?: Record<string, string | number>,
+    demographics?: { age?: number }
   ): Promise<AdvancedClinicalSupport> {
     try {
       
       const age = demographics?.age || 50;
-      const vitals = vitalSigns || {
+      const vitals: AssessmentContext = vitalSigns || {
         systolicBP: 120,
         diastolicBP: 80,
         heartRate: 80,
@@ -213,17 +236,17 @@ private static logAICall(service: string, chiefComplaint: string, success: boole
 
   private static calculateRelevantScores(
     chiefComplaint: string,
-    answers: Record<string, any>,
-    vitals: any,
+    answers: Record<string, Answer>,
+    vitals: AssessmentContext,
     age: number
-  ) {
+  ): SeverityScore[] {
     const scores = [];
     const complaint = chiefComplaint.toLowerCase();
 
     if (complaint.includes('fever') || complaint.includes('infection') || complaint.includes('sepsis')) {
       const qsofa = ClinicalScoringService.calculateQSOFA(
-        vitals.systolicBP,
-        vitals.respiratoryRate,
+        Number(vitals.systolicBP) || 120,
+        Number(vitals.respiratoryRate) || 16,
         15
       );
       scores.push(qsofa);
@@ -233,9 +256,9 @@ private static logAICall(service: string, chiefComplaint: string, success: boole
       const curb65 = ClinicalScoringService.calculateCURB65(
         false,
         5,
-        vitals.respiratoryRate,
-        vitals.systolicBP,
-        vitals.diastolicBP,
+        Number(vitals.respiratoryRate) || 16,
+        Number(vitals.systolicBP) || 120,
+        Number(vitals.diastolicBP) || 80,
         age
       );
       scores.push(curb65);
@@ -245,7 +268,7 @@ private static logAICall(service: string, chiefComplaint: string, success: boole
       const wellsPE = ClinicalScoringService.calculateWellsPE(
         true,
         true,
-        vitals.heartRate,
+        Number(vitals.heartRate) || 80,
         false,
         false,
         false,
@@ -257,10 +280,10 @@ private static logAICall(service: string, chiefComplaint: string, success: boole
     return scores;
   }
 
-  private static extractComorbidities(rosData: Record<string, any>): string[] {
+  private static extractComorbidities(rosData: ReviewOfSystems): string[] {
     const comorbidities: string[] = [];
     
-    Object.entries(rosData).forEach(([system, data]: [string, any]) => {
+    Object.entries(rosData).forEach(([system, data]) => {
       if (data.positive && Array.isArray(data.positive)) {
         comorbidities.push(...data.positive);
       }
@@ -271,13 +294,13 @@ private static logAICall(service: string, chiefComplaint: string, success: boole
 
   private static generateClinicalAlerts(
     chiefComplaint: string,
-    answers: Record<string, any>,
-    vitals: any,
-    severityScores: any[]
-  ) {
+    answers: Record<string, Answer>,
+    vitals: AssessmentContext,
+    severityScores: SeverityScore[]
+  ): ClinicalAlert[] {
     const alerts = [];
 
-    if (vitals.systolicBP < 90) {
+    if (Number(vitals.systolicBP) < 90) {
       alerts.push({
         id: 'hypotension',
         type: 'critical',
@@ -288,7 +311,7 @@ private static logAICall(service: string, chiefComplaint: string, success: boole
       });
     }
 
-    if (vitals.heartRate > 120) {
+    if (Number(vitals.heartRate) > 120) {
       alerts.push({
         id: 'tachycardia',
         type: 'warning',
@@ -299,7 +322,7 @@ private static logAICall(service: string, chiefComplaint: string, success: boole
       });
     }
 
-    if (vitals.oxygenSaturation < 92) {
+    if (Number(vitals.oxygenSaturation) < 92) {
       alerts.push({
         id: 'hypoxia',
         type: 'critical',

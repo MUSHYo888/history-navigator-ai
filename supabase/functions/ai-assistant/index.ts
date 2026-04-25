@@ -81,6 +81,12 @@ interface GeneratedDifferential {
   keyFeatures: string[];
 }
 
+interface DifferentialDiagnosisResponse {
+  pertinentNegatives?: string[];
+  soapNote?: string;
+  differentialDiagnoses?: GeneratedDifferential[];
+}
+
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -215,7 +221,7 @@ Review of Systems: ${JSON.stringify(rosData, null, 2)}
 Generate differential diagnoses.`;
 
       const aiResponse = await callAI(systemPrompt, userPrompt, 3000);
-      const parsedObject = extractJSON(aiResponse, 'object');
+      const parsedObject = extractJSON<DifferentialDiagnosisResponse>(aiResponse, 'object');
       const differentials = parsedObject.differentialDiagnoses || [];
 
       console.log(`[ai-assistant] Generated ${differentials.length} differentials`);

@@ -211,6 +211,76 @@ export type Database = {
           },
         ]
       }
+      past_medical_history: {
+        Row: {
+          id: string
+          conditions: string[] | null
+          surgeries: string[] | null
+          medications: string[] | null
+          allergies: string[] | null
+          family_history: string | null
+          social_history: string | null
+          social_history_structured: Json | null
+        }
+        Insert: {
+          id: string
+          conditions?: string[] | null
+          surgeries?: string[] | null
+          medications?: string[] | null
+          allergies?: string[] | null
+          family_history?: string | null
+          social_history?: string | null
+          social_history_structured?: Json | null
+        }
+        Update: {
+          id?: string
+          conditions?: string[] | null
+          surgeries?: string[] | null
+          medications?: string[] | null
+          allergies?: string[] | null
+          family_history?: string | null
+          social_history?: string | null
+          social_history_structured?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "past_medical_history_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "assessments"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      physical_examination: {
+        Row: {
+          id: string
+          vital_signs: Json | null
+          systems: Json | null
+          general_appearance: string | null
+        }
+        Insert: {
+          id: string
+          vital_signs?: Json | null
+          systems?: Json | null
+          general_appearance?: string | null
+        }
+        Update: {
+          id?: string
+          vital_signs?: Json | null
+          systems?: Json | null
+          general_appearance?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "physical_examination_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "assessments"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       patients: {
         Row: {
           age: number

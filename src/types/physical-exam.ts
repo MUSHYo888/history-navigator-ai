@@ -3,11 +3,11 @@
 
 export interface PhysicalExamData {
   vitalSigns: {
-    bloodPressure: string;
-    heartRate: string;
-    respiratoryRate: string;
-    temperature: string;
-    oxygenSaturation: string;
+    bloodPressure?: string;
+    heartRate?: string;
+    respiratoryRate?: string;
+    temperature?: string;
+    oxygenSaturation?: string;
   };
   systems: {
     [systemName: string]: {

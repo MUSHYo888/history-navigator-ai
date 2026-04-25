@@ -145,7 +145,7 @@ export class FallbackDataService {
   }
 
   static getFallbackDifferentials(chiefComplaint: string): DifferentialDiagnosis[] {
-    const mockDiagnoses: Record<string, any[]> = {
+    const mockDiagnoses: Record<string, DifferentialDiagnosis[]> = {
       'headache': [
         {
           condition: 'Subarachnoid Hemorrhage',
@@ -228,7 +228,7 @@ export class FallbackDataService {
     }
 
     const results = diagnoses || mockDiagnoses['fatigue']; // Default to systemic
-    return results.map((d: any) => ({
+    return results.map((d: DifferentialDiagnosis) => ({
       ...d,
       guidelineCitation: 'Standard Clinical Guidelines',
       statOrders: ['Clinical evaluation', 'Vital signs monitoring']

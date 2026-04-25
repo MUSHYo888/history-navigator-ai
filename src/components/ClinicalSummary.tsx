@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,13 @@ import {
 import { AIService } from '@/services/aiService';
 import { useMedical } from '@/context/MedicalContext';
 import { useCompleteAssessment } from '@/hooks/useAssessment';
+import { DifferentialDiagnosis } from '@/types/medical';
 import { toast } from 'sonner';
+
+interface ExtendedDiagnosis extends DifferentialDiagnosis {
+  statOrders?: string[];
+  guidelineCitation?: string;
+}
 
 export const ClinicalSummary = ({ onComplete, onBack }: { onComplete?: () => void, onBack?: () => void }) => {
   const { state } = useMedical();
@@ -25,18 +31,12 @@ export const ClinicalSummary = ({ onComplete, onBack }: { onComplete?: () => voi
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [differentials, setDifferentials] = useState<any[]>([]);
+  const [differentials, setDifferentials] = useState<ExtendedDiagnosis[]>([]);
   const [pertinentNegatives, setPertinentNegatives] = useState<string[]>([]);
   const [soapNote, setSoapNote] = useState<string>('');
   const [isCopied, setIsCopied] = useState(false);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    if (!state.currentAssessment && !state.answers) return;
-    generateClinicalAnalysis();
-  }, []);
-
-  const generateClinicalAnalysis = async () => {
+  const generateClinicalAnalysis = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -45,9 +45,12 @@ export const ClinicalSummary = ({ onComplete, onBack }: { onComplete?: () => voi
         state.answers,
         state.rosData
       );
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const responseData: any = diffs;
-      setDifferentials(responseData.differentialDiagnoses || responseData);
+      const responseData = diffs as unknown as {
+        differentialDiagnoses?: ExtendedDiagnosis[];
+        pertinentNegatives?: string[];
+        soapNote?: string;
+      };
+      setDifferentials(responseData.differentialDiagnoses || (Array.isArray(diffs) ? diffs : []));
       setPertinentNegatives(responseData.pertinentNegatives || []);
       setSoapNote(responseData.soapNote || '');
     } catch (err) {
@@ -56,7 +59,12 @@ export const ClinicalSummary = ({ onComplete, onBack }: { onComplete?: () => voi
     } finally {
       setLoading(false);
     }
-  };
+  }, [chiefComplaint, state.answers, state.rosData]);
+
+  useEffect(() => {
+    if (!state.currentAssessment && !state.answers) return;
+    generateClinicalAnalysis();
+  }, [generateClinicalAnalysis, state.answers, state.currentAssessment]);
 
   const handleCopyToClipboardNote = async () => {
     try {
@@ -76,14 +84,7 @@ export const ClinicalSummary = ({ onComplete, onBack }: { onComplete?: () => voi
 
     if (state.currentAssessment) {
       try {
-        await completeAssessmentMutation.mutateAsync({
-          assessmentId: state.currentAssessment.id,
-          payload: {
-            differentials,
-            pertinentNegatives,
-            soapNote
-          }
-        });
+        await completeAssessmentMutation.mutateAsync(state.currentAssessment.id);
         toast.success('Assessment saved to patient records!');
         if (onComplete) onComplete();
       } catch (err) {
@@ -203,8 +204,7 @@ export const ClinicalSummary = ({ onComplete, onBack }: { onComplete?: () => voi
                   <div className="text-sm font-semibold mb-1">History of Present Illness</div>
                   <p className="text-sm text-gray-700 leading-relaxed">
                     {Object.entries(state.answers).length > 0 
-                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                      ? Object.entries(state.answers).map(([, a]: any) => `${a.value || ''} ${a.notes ? `(${a.notes})` : ''}`).join('. ')
+                      ? Object.entries(state.answers).map(([, a]) => `${a.value || ''} ${a.notes ? `(${a.notes})` : ''}`).join('. ')
                       : 'No HPI data recorded.'}
                   </p>
                 </div>
