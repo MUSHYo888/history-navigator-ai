@@ -70,13 +70,6 @@ export class AIService {
     previousAnswers?: Record<string, Answer>
   ): Promise<Question[]> {
     try {
-      const systemPrompt = `You are a clinical AI assistant generating focused medical history questions.
-      Generate 4-6 relevant questions following the SOCRATES/OLDCARTS framework.
-      Return ONLY a valid JSON object with a "questions" array matching this structure:
-      { "questions": [ { "id": "uuid", "text": "Question text?", "type": "multiple-choice", "options": ["Option 1", "Option 2"], "category": "onset", "required": true } ] }`;
-      
-      const userPrompt = `Chief complaint: ${chiefComplaint}\nPrevious answers: ${JSON.stringify(previousAnswers || {})}`;
-      
       const result = await this.callAIAssistant('generate-questions', { chiefComplaint, previousAnswers: previousAnswers || {} }) as { questions?: Partial<Question>[] };
       const questions = (result.questions || []).map((q: Partial<Question>) => ({
         ...q,
@@ -101,16 +94,6 @@ export class AIService {
     rosData?: ReviewOfSystems
   ): Promise<DDxResponse> {
     try {
-      const systemPrompt = `You are an expert clinical diagnostician. Analyze the clinical presentation and generate a comprehensive differential diagnosis list.
-      You must extract 3-5 pertinent negatives from the HPI/ROS.
-      Draft a complete, formal SOAP note based on the provided clinical data.
-      For each diagnosis, you must provide a real-world, evidence-based guideline citation.
-      Instead of generic investigations, provide actionable, STAT order sets (CPOE style).
-      Return ONLY a valid JSON object matching this exact structure:
-      { "pertinentNegatives": ["negative 1"], "soapNote": "S: ...", "differentials": [ { "condition": "Condition Name", "probability": 85, "explanation": "Clinical reasoning", "keyFeatures": ["Supporting feature 1"], "conflictingFeatures": ["Feature against"], "urgency": "high", "category": "cardiovascular", "redFlags": ["Red flag 1"], "guidelineCitation": "2021 AHA/ACC", "statOrders": ["STAT ECG"] } ] }
-      Generate 5-8 diagnoses ranked by probability (0-100). Include common and serious conditions.`;
-
-      const userPrompt = `Chief Complaint: ${chiefComplaint}\nPatient answers: ${JSON.stringify(answers)}\nReview of Systems: ${JSON.stringify(rosData || {})}`;
       
       const result = await this.callAIAssistant('generate-differential', { chiefComplaint, answers, rosData: rosData || {} }) as { differentials?: DifferentialDiagnosis[], pertinentNegatives?: string[], soapNote?: string };
 
@@ -138,12 +121,6 @@ export class AIService {
     rosData?: ReviewOfSystems
   ): Promise<ClinicalDecisionSupport> {
     try {
-      const systemPrompt = `You are a clinical AI assistant providing investigation recommendations and clinical decision support.
-      Return ONLY a valid JSON object matching this exact structure:
-      { "investigations": [ { "investigation": { "id": "unique_id", "name": "Test Name", "type": "laboratory", "category": "Cat", "indication": "Reason", "urgency": "routine", "cost": "low", "rationale": "Scientific rationale" }, "priority": 1, "clinicalRationale": "Why this is recommended", "contraindications": [] } ], "redFlags": [ { "condition": "Name", "severity": "high", "description": "Desc", "immediateActions": ["Action1"] } ], "guidelines": [ { "title": "Guideline title", "source": "Source", "recommendation": "Recommendation", "evidenceLevel": "A", "applicableConditions": ["Condition1"] } ], "treatmentRecommendations": ["Treatment1"], "followUpRecommendations": ["Followup1"] }
-      Provide evidence-based recommendations.`;
-
-      const userPrompt = `Chief complaint: ${chiefComplaint}\nDifferential diagnoses: ${JSON.stringify(differentialDiagnoses)}\nPatient answers: ${JSON.stringify(answers)}\nReview of Systems: ${JSON.stringify(rosData || {})}`;
       
       const cdsResult = await this.callAIAssistant('generate-clinical-support', { chiefComplaint, differentialDiagnoses, answers, rosData: rosData || {} }) as { clinicalSupport?: ClinicalDecisionSupport };
       const result = (cdsResult.clinicalSupport || cdsResult) as unknown as ClinicalDecisionSupport;
