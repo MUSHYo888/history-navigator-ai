@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { User, Settings, LogOut, Menu } from 'lucide-react';
+import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
+import { UserProfile } from '@/components/UserProfile';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -30,7 +32,17 @@ export function Header() {
         <div className="hidden md:flex items-center space-x-3 lg:space-x-4">
           <div className="flex items-center space-x-2 text-sm text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-md">
             <User className="h-4 w-4" />
-            <span className="max-w-[200px] truncate">{user?.email || 'User'}</span>
+            <Dialog>
+              <DialogTrigger asChild>
+                <div className="cursor-pointer flex items-center space-x-2 text-sm text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-md hover:bg-muted">
+                  <User className="h-4 w-4" />
+                  <span className="max-w-[200px] truncate">{user?.email || 'User'}</span>
+                </div>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px]">
+                <UserProfile user={{ name: user?.email || 'User', email: user?.email || '' }} />
+              </DialogContent>
+            </Dialog>
           </div>
           
           <Button variant="ghost" size="sm" className="hover-lift">
@@ -55,7 +67,17 @@ export function Header() {
             <div className="flex flex-col space-y-4 mt-8">
               <div className="flex items-center space-x-3 p-3 bg-muted/50 rounded-lg">
                 <User className="h-5 w-5 text-muted-foreground" />
-                <span className="text-sm truncate">{user?.email || 'User'}</span>
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <div className="cursor-pointer flex items-center space-x-3 p-3 bg-muted/50 rounded-lg hover:bg-muted">
+                      <User className="h-5 w-5 text-muted-foreground" />
+                      <span className="text-sm truncate">{user?.email || 'User'}</span>
+                    </div>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[425px]">
+                    <UserProfile user={{ name: user?.email || 'User', email: user?.email || '' }} />
+                  </DialogContent>
+                </Dialog>
               </div>
               
               <Button 
