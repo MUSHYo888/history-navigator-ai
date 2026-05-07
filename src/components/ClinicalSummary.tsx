@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Printer, Download, ArrowLeft, Loader2 } from 'lucide-react';
-import { useMedical } from '@/hooks/useMedical';
+import { useMedical } from '@/context/MedicalContext';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { DifferentialDiagnosis, Answer } from '@/types/medical';
@@ -64,8 +64,7 @@ export function ClinicalSummary({ onBack, chiefComplaint, hpiNote, onComplete }:
   };
 
   const handleBackToProfile = () => {
-    if (onBack) onBack();
-    else navigate('/');
+    navigate('/');
   };
 
   // Formatting helpers

@@ -1,8 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
+import React, { useStateframer-motion";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,15 +13,16 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useMedical } from "@/hooks/useMedical";
+import { useMedical } from "@/context/MedicalContext";
 
-import { AssessmentHeader } from "@/components/AssessmentHeader";
-import { AssessmentProgress } from "@/components/AssessmentProgress";
+import { AssessmentHeader } f/noom "@/components/AssessmentProgress";
 import { ReviewOfSystemsComponent } from "@/components/ReviewOfSystemsComponent";
 import { PastMedicalHistory } from "@/components/PastMedicalHistory";
 import { PhysicalExamination } from "@/components/PhysicalExamination";
 import { DifferentialDiagnosisEngine } from "@/components/DifferentialDiagnosisEngine";
 import { PatientDemographics } from "@/components/PatientDemographics";
+import { ClinicalSummary } from "@/components/ClinicalSummary";
+import { AssessmentService } from "@/services/assessmentService";
 
 const commonComplaints = [
   { name: 'Headache', icon: Brain, category: 'Neurological' },
@@ -83,10 +82,10 @@ const defaultHpiQuestions = [
 
 export default function Intake() {
   const navigate = useNavigate();
-  const { dispatch } = useMedical();
-  const [step, setStep] = useState(1);
-  const [loading, setLoading] = useState(false);
-  const [complaintSearchTerm, setComplaintSearchTerm] = useState('');
+  const [searchParams] = useSearchParams();
+  const { state, dispatch } = useMedical();
+  const initialStep = searchParams.get('step') ? parseInt(searchParams.get('step') as string, 10) : 1;
+  consts[complaintSearchTerm, setComplaintSearchTerm] = useState('');
   const [hpiAnswers, setHpiAnswers] = useState<Record<string, string[]>>({});
 
   const [formData, setFormData] = useState({
@@ -104,6 +103,71 @@ export default function Intake() {
   const updateField = (field: string, value: unknown) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
+
+  useEffect(() => {
+    const resumeId = searchParams.get('resume');
+    if (resumeId && (!state.currentAssessment || state.currentAssessment.id !== resumeId)) {
+      const loadAssessment = async () => {
+        setLoading(true);
+        try {
+          const { data: assessment, error } = await supabase
+            .from('assessments')
+            .select('*, patients!inner(*)')
+            .eq('id', resumeId)
+            .single();
+
+          if (error) throw error;
+
+          dispatch({ 
+            type: 'SET_CURRENT_PATIENT', 
+            payload: {
+              id: assessment.patients.id,
+              name: assessment.patients.name,
+              age: assessment.patients.age,
+              gender: assessment.patients.gender as any,
+              patientId: assessment.patients.patient_id,
+              location: assessment.patients.location,
+              createdAt: assessment.patients.created_at
+            }
+          });
+
+          dispatch({
+            type: 'SET_CURRENT_ASSESSMENT',
+            payload: {
+              id: assessment.id,
+              patientId: assessment.patient_id,
+              chiefComplaint: assessment.chief_complaint,
+              status: assessment.status as any,
+              currentStep: assessment.current_step,
+              createdAt: assessment.created_at,
+              updatedAt: assessment.updated_at
+            }
+          });
+
+          const [answers, rosData, pmhData, peData] = await Promise.all([
+            AssessmentService.getAssessmentAnswers(resumeId).catch(() => ({})),
+            AssessmentService.getReviewOfSystems(resumeId).catch(() => ({})),
+            AssessmentService.getPastMedicalHistory(resumeId).catch(() => null),
+            AssessmentService.getPhysicalExamination(resumeId).catch(() => null)
+          ]);
+          
+          if (answers && Object.keys(answers).length > 0) dispatch({ type: 'SET_ALL_ANSWERS', payload: answers });
+          if (rosData && Object.keys(rosData).length > 0) dispatch({ type: 'SET_ROS_DATA', payload: rosData });
+          if (pmhData) dispatch({ type: 'SET_PMH_DATA', payload: pmhData });
+          if (peData) dispatch({ type: 'SET_PE_DATA', payload: peData });
+
+          updateField('chiefComplaint', assessment.chief_complaint);
+        } catch (err) {
+          console.error("Failed to load assessment for resume:", err);
+          toast.error("Failed to load assessment data.");
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      loadAssessment();
+    }
+  }, [searchParams, state.currentAssessment?.id, dispatch]);
 
   const steps = [
     "Demographics",
@@ -286,6 +350,15 @@ export default function Intake() {
     }
   };
 
+  if (loading && step === 8 && !state.currentPatient) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50/50">
+        <Loader2 className="h-8 w-8 animate-spin text-primary mr-2" />
+        <span className="text-muted-foreground">Loading patient summary...</span>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
       <div className="mx-auto max-w-[95%] space-y-6">
@@ -297,19 +370,20 @@ export default function Intake() {
 
         {/* Main Form Card */}
         <Card className="shadow-lg border-t-4 border-t-primary">
-          <CardHeader>
-            <AssessmentHeader chiefComplaint={formData.chiefComplaint || "Not selected"} />
-            <AssessmentProgress 
-              currentStep={step} 
-              totalSteps={7} 
-              steps={steps} 
-              progressPercent={(step / 7) * 100} 
-              answersCount={step === 3 ? answeredCount : 0} 
-            />
-          </CardHeader>
-          
+          {step !== 8 && (
+            <CardHeader>
+              <AssessmentHeader chiefComplaint={formData.chiefComplaint || "Not selected"} />
+              <AssessmentProgress 
+                currentStep={step} 
+                totalSteps={7}
+                steps={steps}
+                progressPercent={(step / 7) * 100}
+                answersCount={step === 3 ? answeredCount : 0}
+              />
+            </CardHeader>
+          )}
           <CardContent>
-            <motion.div 
+            <motion.div
               key={step}
               initial={{ opacity: 0, x: 10 }}
               animate={{ opacity: 1, x: 0 }}
@@ -450,36 +524,51 @@ export default function Intake() {
                 </div>
               )}
               
+              {/* STEP 8: Clinical Summary */}
+              {step === 8 && (
+                <div className="[&_.p-6]:px-0 [&_.shadow-lg]:shadow-none">
+                  <ClinicalSummary 
+                    chiefComplaint={formData.chiefComplaint}
+                    hpiNote={formData.hpi}
+                    onComplete={() => navigate("/")}
+                    onBack={() => setStep(7)}
+                  />
+                </div>
+              )}
+              
             </motion.div>
 
             {/* Form Actions */}
-            <div className="flex flex-col sm:flex-row items-center justify-between pt-6 border-t mt-8 gap-4">
-              {step === 1 ? (
-                <Button variant="outline" onClick={() => navigate("/")} className="w-full sm:w-auto">
-                  <ArrowLeft className="mr-2 h-4 w-4" /> Back to Dashboard
-                </Button>
-              ) : (
-                <Button variant="outline" onClick={handlePrev} disabled={loading} className="w-full sm:w-auto">
-                  <ChevronLeft className="mr-2 h-4 w-4" /> Previous
-                </Button>
-              )}
-              
-              <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-                {step < 7 ? (
-                  <Button onClick={handleNext} className="w-full sm:w-auto">
-                    Next <ChevronRight className="ml-2 h-4 w-4" />
+            {step !== 8 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between pt-6 border-t mt-8 gap-4">
+                {step === 1 ? (
+                  <Button variant="outline" onClick={() => navigate("/")} className="w-full sm:w-auto">
+                    <ArrowLeft className="mr-2 h-4 w-4" /> Back to Dashboard
                   </Button>
                 ) : (
-                  <Button onClick={handleCompleteIntake} disabled={loading} className="w-full sm:w-auto bg-primary hover:bg-primary/90">
-                    {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
-                    Complete History
+                  <Button variant="outline" onClick={handlePrev} disabled={loading} className="w-full sm:w-auto">
+                    <ChevronLeft className="mr-2 h-4 w-4" /> Previous
                   </Button>
                 )}
+                
+                <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                  {step < 7 && (
+                    <Button onClick={handleNext} disabled={loading} className="w-full sm:w-auto">
+                      Next <ChevronRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  )}
+                  {step === 7 && (
+                    <Button onClick={handleCompleteIntake} disabled={loading} className="w-full sm:w-auto">
+                      {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
+                      Complete Intake
+                    </Button>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
           </CardContent>
         </Card>
       </div>
     </div>
-  );
+          )}
 }

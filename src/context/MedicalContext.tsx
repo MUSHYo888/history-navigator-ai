@@ -1,7 +1,7 @@
 
 // ABOUTME: Global state management for medical assessment workflow
 // ABOUTME: Manages patient data, assessment state, answers, and clinical data
-import React, { createContext, useReducer, ReactNode } from 'react';
+import React, { createContext, useContext, useReducer, ReactNode } from 'react';
 import { Patient, Assessment, Answer, ReviewOfSystems } from '@/types/medical';
 import { PhysicalExamData } from '@/types/physical-exam';
 
@@ -134,4 +134,12 @@ export function MedicalProvider({ children }: { children: ReactNode }) {
       {children}
     </MedicalContext.Provider>
   );
+}
+
+export function useMedical() {
+  const context = useContext(MedicalContext);
+  if (context === undefined) {
+    throw new Error('useMedical must be used within a MedicalProvider');
+  }
+  return context;
 }

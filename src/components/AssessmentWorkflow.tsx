@@ -1,9 +1,10 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { EnhancedQuestionGeneratorService, PhaseTransitionData } from '@/services/clinical/EnhancedQuestionGeneratorService';
 import { Question, Answer } from '@/types/medical';
-import { useMedical } from '@/hooks/useMedical';
+import { useMedical } from '@/context/MedicalContext';
 import { QuestionComponent } from './QuestionComponent';
 import { ReviewOfSystemsComponent } from './ReviewOfSystemsComponent';
 import { PastMedicalHistory } from './PastMedicalHistory';
@@ -19,6 +20,8 @@ import { useSaveQuestions, useSaveAnswer, useCompleteAssessment } from '@/hooks/
 import { toast } from 'sonner';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { AssessmentErrorRecovery } from './AssessmentErrorRecovery';
+import { AssessmentService } from '@/services/assessmentService';
+import { supabase } from '@/integrations/supabase/client';
 
 interface AssessmentWorkflowProps {
   chiefComplaint: string;
@@ -49,6 +52,7 @@ function AssessmentWorkflowContent({ chiefComplaint, onComplete, onBack }: Asses
   const [currentView, setCurrentView] = useState<number | 'summary'>(1);
   const [cdsRetryKey, setCdsRetryKey] = useState(0);
   const [stepTransitionLoading, setStepTransitionLoading] = useState(false);
+  const [isHydrating, setIsHydrating] = useState(false);
 
   const saveQuestionsMutation = useSaveQuestions();
   const saveAnswerMutation = useSaveAnswer();
@@ -73,6 +77,41 @@ function AssessmentWorkflowContent({ chiefComplaint, onComplete, onBack }: Asses
       setLoading(true);
       setError(null);
       
+      // Check if questions already exist in the database for this assessment
+      if (state.currentAssessment) {
+        const { data: existingQuestions, error: fetchError } = await supabase
+          .from('questions')
+          .select('*')
+          .eq('assessment_id', state.currentAssessment.id)
+          .order('order_index');
+
+        if (!fetchError && existingQuestions && existingQuestions.length > 0) {
+          const mappedQuestions: Question[] = existingQuestions.map(q => ({
+            id: q.id,
+            text: q.question_text,
+            type: q.question_type as any,
+            options: q.options as string[] | undefined,
+            category: q.category,
+            required: q.required,
+            phase: (q as any).phase as 1 | 2,
+            clinicalPriority: (q as any).clinical_priority as any,
+            redFlagIndicator: (q as any).red_flag_indicator,
+            questionRationale: (q as any).question_rationale || undefined,
+            followUpTrigger: (q as any).follow_up_trigger || undefined
+          }));
+          
+          const p1 = mappedQuestions.filter(q => !q.phase || q.phase === 1);
+          const p2 = mappedQuestions.filter(q => q.phase === 2);
+          
+          setPhase1Questions(p1);
+          if (p2.length > 0) {
+            setPhase2Questions(p2);
+            setPhase2Triggered(true);
+          }
+          return; // Skip generation and saving since we loaded them
+        }
+      }
+
       // Generate Phase 1 questions using clinical templates
       const questions = EnhancedQuestionGeneratorService.generatePhase1Questions(chiefComplaint);
       
@@ -118,14 +157,86 @@ function AssessmentWorkflowContent({ chiefComplaint, onComplete, onBack }: Asses
   }, [chiefComplaint, isCompleted, state.currentAssessment, saveQuestionsMutation]);
 
   useEffect(() => {
-    if (isCompleted) {
-      setCurrentView('summary');
+    const initializeWorkflow = async () => {
+      setLoading(true);
+      setError(null);
+
+      // Hydrate state from database if context is empty but we have an assessment ID
+      if (state.currentAssessment && Object.keys(state.answers).length === 0) {
+        setIsHydrating(true);
+        try {
+          const assessmentId = state.currentAssessment.id;
+          
+          const answers = await AssessmentService.getAssessmentAnswers(assessmentId).catch(() => ({}));
+          if (answers && Object.keys(answers).length > 0) {
+            dispatch({ type: 'SET_ALL_ANSWERS', payload: answers });
+            setPhase1Answers(answers);
+          }
+
+          const { data: rosRows } = await supabase
+            .from('review_of_systems')
+            .select('*')
+            .eq('assessment_id', assessmentId);
+            
+          if (rosRows && rosRows.length > 0) {
+            const rosMap: Record<string, any> = {};
+            rosRows.forEach(row => {
+              rosMap[row.system_name] = {
+                positive: row.positive_symptoms || [],
+                negative: row.negative_symptoms || [],
+                notes: row.notes || ''
+              };
+            });
+            dispatch({ type: 'SET_ROS_DATA', payload: rosMap });
+          }
+
+          const { data: assessmentDetails } = await supabase.from('assessments')
+            .select('pmh_data, pe_data, patients(*)')
+            .eq('id', assessmentId)
+            .maybeSingle();
+            
+          if (assessmentDetails) {
+            if (assessmentDetails.pmh_data) dispatch({ type: 'SET_PMH_DATA', payload: assessmentDetails.pmh_data });
+            if (assessmentDetails.pe_data) dispatch({ type: 'SET_PE_DATA', payload: assessmentDetails.pe_data });
+            
+            if (!state.currentPatient && assessmentDetails.patients) {
+              const p = assessmentDetails.patients as any;
+              dispatch({ 
+                type: 'SET_CURRENT_PATIENT', 
+                payload: {
+                  id: p.id,
+                  name: p.name,
+                  age: p.age,
+                  gender: p.gender,
+                  patientId: p.patient_id,
+                  location: p.location || '',
+                  createdAt: p.created_at,
+                  lastAssessment: p.last_assessment
+                }
+              });
+            }
+          }
+        } catch (err) {
+          console.error("Failed to hydrate assessment data:", err);
+        } finally {
+          setIsHydrating(false);
+        }
+      }
+
+      if (isCompleted) {
+        setCurrentView('summary');
+      } else {
+        if ((state.currentStep || 1) >= 6) setCurrentView('summary');
+        else setCurrentView(state.currentStep || 1);
+        
+        if ((state.currentStep || 1) <= 2) await loadPhase1Questions();
+      }
       setLoading(false);
-    } else {
-      setCurrentView(state.currentStep || 1);
-      loadPhase1Questions();
-    }
-  }, [isCompleted, state.currentStep, loadPhase1Questions]);
+    };
+
+    initializeWorkflow();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chiefComplaint, isCompleted, state.currentStep, state.currentAssessment?.id]);
 
   const handleAnswerSubmit = async (questionId: string, answer: Omit<Answer, 'questionId'>) => {
     
@@ -279,22 +390,65 @@ function AssessmentWorkflowContent({ chiefComplaint, onComplete, onBack }: Asses
     await updateStep(2);
   };
 
-  const proceedFromROS = async () => {
-    setCurrentView(3);
-    await updateStep(3);
+  const handleROSComplete = async () => {
+    try {
+      setStepTransitionLoading(true);
+      setCurrentView(3);
+      await updateStep(3);
+      toast.success('Review of Systems completed');
+    } catch (error) {
+      console.error('Error completing ROS:', error);
+      toast.error('Failed to complete Review of Systems');
+    } finally {
+      setStepTransitionLoading(false);
+    }
   };
 
-  const proceedFromPMH = async () => {
-    setCurrentView(4);
-    await updateStep(4);
+  const handlePMHComplete = async (pmhData: any) => {
+    try {
+      setStepTransitionLoading(true);
+      dispatch({ type: 'SET_PMH_DATA', payload: pmhData });
+      
+      if (state.currentAssessment?.id) {
+        await supabase.from('assessments')
+          .update({ pmh_data: pmhData })
+          .eq('id', state.currentAssessment.id);
+      }
+      
+      setCurrentView(4);
+      await updateStep(4);
+      toast.success('Past Medical History saved');
+    } catch (error) {
+      console.error('Error completing PMH:', error);
+      toast.error('Failed to save Past Medical History');
+    } finally {
+      setStepTransitionLoading(false);
+    }
   };
 
-  const proceedFromPE = async () => {
-    setCurrentView(5);
-    await updateStep(5);
+  const handlePEComplete = async (peData: any) => {
+    try {
+      setStepTransitionLoading(true);
+      dispatch({ type: 'SET_PE_DATA', payload: peData });
+      
+      if (state.currentAssessment?.id) {
+        await supabase.from('assessments')
+          .update({ pe_data: peData })
+          .eq('id', state.currentAssessment.id);
+      }
+      
+      setCurrentView(5);
+      await updateStep(5);
+      toast.success('Physical examination completed');
+    } catch (error) {
+      console.error('Error completing Physical Examination:', error);
+      toast.error('Failed to save physical examination. Please try again.');
+    } finally {
+      setStepTransitionLoading(false);
+    }
   };
 
-  const handleClinicalDecisionSupportComplete = async () => {
+  const handleClinicalDecisionSupportComplete = async (clinicalPlan: any) => {
     try {
       setStepTransitionLoading(true);
       setCurrentView('summary');
@@ -365,6 +519,18 @@ function AssessmentWorkflowContent({ chiefComplaint, onComplete, onBack }: Asses
   const progressPercent = calculateProgress();
   const answeredCount = Object.keys(state.answers).length;
   const currentQuestion = getCurrentQuestion();
+
+  if (isHydrating) {
+    return (
+      <div className="p-6">
+        <Card className="max-w-4xl mx-auto">
+          <CardContent className="p-8">
+            <LoadingState message="Loading patient chart..." subMessage="Hydrating clinical data" />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (loading || stepTransitionLoading) {
     return (
@@ -448,54 +614,33 @@ function AssessmentWorkflowContent({ chiefComplaint, onComplete, onBack }: Asses
       );
     case 4:
       return (
-        <div className="p-6">
-          <Card className="max-w-6xl mx-auto shadow-sm">
-            <CardContent className="p-6">
-              <PhysicalExamination />
-              <div className="flex justify-between pt-6 border-t mt-6">
-                <Button variant="outline" onClick={() => {
-                  setCurrentView(3);
-                  dispatch({ type: 'SET_STEP', payload: 3 });
-                }}>Back</Button>
-                <Button onClick={proceedFromPE}>Continue to Decision Support</Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <PhysicalExamination
+          onComplete={handlePEComplete}
+          onBack={() => {
+            setCurrentView(3);
+            dispatch({ type: 'SET_STEP', payload: 3 });
+          }}
+        />
       );
     case 3:
       return (
-        <div className="p-6">
-          <Card className="max-w-6xl mx-auto shadow-sm">
-            <CardContent className="p-6">
-              <PastMedicalHistory />
-              <div className="flex justify-between pt-6 border-t mt-6">
-                <Button variant="outline" onClick={() => {
-                  setCurrentView(2);
-                  dispatch({ type: 'SET_STEP', payload: 2 });
-                }}>Back</Button>
-                <Button onClick={proceedFromPMH}>Continue to Physical Exam</Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <PastMedicalHistory
+          onSubmit={handlePMHComplete}
+          onBack={() => {
+            setCurrentView(2);
+            dispatch({ type: 'SET_STEP', payload: 2 });
+          }}
+        />
       );
     case 2:
       return (
-        <div className="p-6">
-          <Card className="max-w-6xl mx-auto shadow-sm">
-            <CardContent className="p-6">
-              <ReviewOfSystemsComponent />
-              <div className="flex justify-between pt-6 border-t mt-6">
-                <Button variant="outline" onClick={() => {
-                  setCurrentView(1);
-                  dispatch({ type: 'SET_STEP', payload: 1 });
-                }}>Back</Button>
-                <Button onClick={proceedFromROS}>Continue to Medical History</Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <ReviewOfSystemsComponent
+          onComplete={handleROSComplete}
+          onBack={() => {
+            setCurrentView(1);
+            dispatch({ type: 'SET_STEP', payload: 1 });
+          }}
+        />
       );
     case 1:
     default:
@@ -503,14 +648,18 @@ function AssessmentWorkflowContent({ chiefComplaint, onComplete, onBack }: Asses
         <div className="p-6">
           <Card className="max-w-4xl mx-auto">
             <CardHeader>
-              <AssessmentHeader chiefComplaint={chiefComplaint} error={error} />
-              <AssessmentProgress
-                currentStep={state.currentStep}
-                totalSteps={steps.length}
-                steps={steps}
-                progressPercent={progressPercent}
-                answersCount={answeredCount}
-              />
+              {currentView !== 8 && currentView !== 'summary' && (
+                <>
+                  <AssessmentHeader chiefComplaint={chiefComplaint} error={error} />
+                  <AssessmentProgress
+                    currentStep={state.currentStep}
+                    totalSteps={steps.length}
+                    steps={steps}
+                    progressPercent={progressPercent}
+                    answersCount={answeredCount}
+                  />
+                </>
+              )}
               <div className="mt-4 p-3 bg-gray-50 rounded-lg">
                 <div className="flex justify-between text-sm text-gray-600">
                   <span>Phase {currentPhase}: Question {getCurrentQuestionNumber()} of {getTotalQuestions()}</span>
