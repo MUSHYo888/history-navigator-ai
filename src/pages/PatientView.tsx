@@ -96,7 +96,7 @@ export default function PatientView() {
           toast.error("Cannot load summary: missing assessment ID");
           return;
         }
-        navigate(`/intake?resume=${assessmentId}&step=8`);
+        navigate(`/patient/${id}/assessment/${assessmentId}/summary`);
       }}
       onDeletePatient={() => navigate('/')}
     />

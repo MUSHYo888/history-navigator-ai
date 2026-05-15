@@ -17,6 +17,7 @@ const WelcomeSandbox = lazy(() => import("./pages/WelcomeSandbox"));
 const Intake = lazy(() => import("./pages/Intake"));
 const NewMedicalDashboard = lazy(() => import("./pages/Dashboard"));
 const PatientView = lazy(() => import("./pages/PatientView"));
+const AssessmentSummary = lazy(() => import("./pages/AssessmentSummary"));
 
 const queryClient = new QueryClient();
 
@@ -45,6 +46,11 @@ const App = () => (
                 <Route path="/patient/:id" element={
                   <ProtectedRoute>
                     <PatientView />
+                  </ProtectedRoute>
+                } />
+                <Route path="/patient/:patientId/assessment/:assessmentId/summary" element={
+                  <ProtectedRoute>
+                    <AssessmentSummary />
                   </ProtectedRoute>
                 } />
                 <Route path="/intake" element={
