@@ -60,6 +60,8 @@ export type Database = {
           current_step: number
           id: string
           patient_id: string
+          pe_data: Json | null
+          pmh_data: Json | null
           status: string
           updated_at: string
         }
@@ -69,6 +71,8 @@ export type Database = {
           current_step?: number
           id?: string
           patient_id: string
+          pe_data?: Json | null
+          pmh_data?: Json | null
           status?: string
           updated_at?: string
         }
@@ -78,6 +82,8 @@ export type Database = {
           current_step?: number
           id?: string
           patient_id?: string
+          pe_data?: Json | null
+          pmh_data?: Json | null
           status?: string
           updated_at?: string
         }
