@@ -48,6 +48,11 @@ const App = () => (
                     <PatientView />
                   </ProtectedRoute>
                 } />
+                <Route path="/patient/:patientId/assessment/:assessmentId/summary" element={
+                  <ProtectedRoute>
+                    <AssessmentSummary />
+                  </ProtectedRoute>
+                } />
                 <Route path="/intake" element={
                   <ProtectedRoute>
                     <Intake />
