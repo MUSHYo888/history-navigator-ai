@@ -87,7 +87,7 @@ export default function Intake() {
   const [searchParams] = useSearchParams();
   const { state, dispatch } = useMedical();
   const initialStep = searchParams.get('step') ? parseInt(searchParams.get('step') as string, 10) : 1;
-  consts[complaintSearchTerm, setComplaintSearchTerm] = useState('');
+  const [complaintSearchTerm, setComplaintSearchTerm] = useState('');
   const [hpiAnswers, setHpiAnswers] = useState<Record<string, string[]>>({});
 
   const [formData, setFormData] = useState({
