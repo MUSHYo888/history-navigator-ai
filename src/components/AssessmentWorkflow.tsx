@@ -196,8 +196,8 @@ function AssessmentWorkflowContent({ chiefComplaint, onComplete, onBack }: Asses
             .maybeSingle();
             
           if (assessmentDetails) {
-            if (assessmentDetails.pmh_data) dispatch({ type: 'SET_PMH_DATA', payload: assessmentDetails.pmh_data });
-            if (assessmentDetails.pe_data) dispatch({ type: 'SET_PE_DATA', payload: assessmentDetails.pe_data });
+            if (assessmentDetails.pmh_data) dispatch({ type: 'SET_PMH_DATA', payload: assessmentDetails.pmh_data as any });
+            if (assessmentDetails.pe_data) dispatch({ type: 'SET_PE_DATA', payload: assessmentDetails.pe_data as any });
             
             if (!state.currentPatient && assessmentDetails.patients) {
               const p = assessmentDetails.patients as any;
