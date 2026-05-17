@@ -341,6 +341,16 @@ export function ReviewOfSystemsComponent({ onComplete, onBack }: ReviewOfSystems
           </div>
         </CardContent>
       </Card>
+      {(onBack || onComplete) && (
+        <div className="flex justify-between pt-6 mt-4 border-t">
+          {onBack ? (
+            <Button variant="outline" onClick={onBack}>Back</Button>
+          ) : <span />}
+          {onComplete && (
+            <Button onClick={() => onComplete()}>Continue</Button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
