@@ -2,26 +2,8 @@
 // ABOUTME: Global state management for medical assessment workflow
 // ABOUTME: Manages patient data, assessment state, answers, and clinical data
 import React, { createContext, useContext, useReducer, ReactNode } from 'react';
-import { Patient, Assessment, Answer, ReviewOfSystems } from '@/types/medical';
+import { Patient, Assessment, Answer, ReviewOfSystems, PastMedicalHistoryData } from '@/types/medical';
 import { PhysicalExamData } from '@/types/physical-exam';
-
-interface PastMedicalHistoryData {
-  conditions: string[];
-  surgeries: string[];
-  medications: string[];
-  allergies: string[];
-  familyHistory: string;
-  socialHistory: string;
-  socialHistoryStructured?: {
-    smokingStatus: string;
-    packYears: string;
-    alcoholUse: string;
-    alcoholDetails: string;
-    occupation: string;
-    livingSituation: string;
-    otherNotes: string;
-  };
-}
 
 
 interface MedicalState {
