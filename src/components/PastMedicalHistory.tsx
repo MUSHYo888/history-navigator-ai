@@ -28,7 +28,21 @@ const commonConditions = [
   'Cancer', 'Kidney Disease', 'Liver Disease', 'Depression', 'Anxiety'
 ];
 
-export function PastMedicalHistory() {
+interface PastMedicalHistoryProps {
+  onSubmit?: (pmhData: ReturnType<PastMedicalHistoryCompiler>) => void;
+  onBack?: () => void;
+}
+type PastMedicalHistoryCompiler = () => {
+  conditions: string[];
+  surgeries: string[];
+  medications: string[];
+  allergies: string[];
+  familyHistory: string;
+  socialHistory: string;
+  socialHistoryStructured: SocialHistoryData;
+};
+
+export function PastMedicalHistory({ onSubmit, onBack }: PastMedicalHistoryProps = {}) {
   const { state, dispatch } = useMedical();
 
   const [activeConditions, setActiveConditions] = useState<string[]>(state.pmhData?.conditions || []);
